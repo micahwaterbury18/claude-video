@@ -263,7 +263,7 @@ function createPistol() {
  * Returns the whole model plus handles on the parts that move, so other files
  * can pose him without knowing how he's put together.
  */
-export function createPenguini() {
+export function createPenguini({ shades: wearShades = false } = {}) {
   const root = new THREE.Group();
   root.name = 'penguini';
 
@@ -383,12 +383,12 @@ export function createPenguini() {
   const pupils = [];
   for (const side of [-1, 1]) {
     const white = new THREE.Mesh(new THREE.SphereGeometry(0.098, 16, 14), mat(0xfdfdfd, { roughness: 0.35 }));
-    white.position.set(side * 0.163, 0.010, 0.330);
+    white.position.set(side * 0.163, 0.010, wearShades ? 0.330 : 0.375);
     white.scale.set(1, 1.0, 0.66);
     eyes.add(white);
 
     const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.047, 12, 10), mat(0x101318, { roughness: 0.3 }));
-    pupil.position.set(side * 0.168, -0.008, 0.390);
+    pupil.position.set(side * 0.168, -0.008, wearShades ? 0.390 : 0.432);
     eyes.add(pupil);
     pupils.push(pupil);
   }
@@ -422,9 +422,11 @@ export function createPenguini() {
   const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.030, 0.045), lensMat);
   bridge.position.set(0, 0.002, 0.335);
   shades.add(bridge);
-  shades.position.set(0, 0.055, 0.130);   // on his face, where they belong
+  shades.position.set(0, 0.055, 0.130);
   shades.rotation.x = -0.06;
-  head.add(shades);
+  // Off by default - you can read his face without them, and the anger is the
+  // point. Pass { shades: true } to createPenguini() to put them back on.
+  if (wearShades) head.add(shades);
 
   const beanie = createBeanie();
   beanie.position.y = 0.205;
