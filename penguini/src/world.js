@@ -131,3 +131,124 @@ export function createWorld(scene) {
 
   return { ground, lights, groundHeightAt: drift };
 }
+
+/**
+ * The lit windows on a tower, painted with code onto a canvas.
+ *
+ * We make one image of a grid of windows - some lit, some dark - and hang it
+ * on every tower. Because each tower is a different size, the grid stretches
+ * differently on each one, so they don't look copy-pasted.
+ */
+function createWindowTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  // Dark glass everywhere to start.
+  ctx.fillStyle = '#0b1524';
+  ctx.fillRect(0, 0, 128, 256);
+
+  const cols = 6;
+  const rows = 20;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      // Most windows are dark. It's the middle of the night.
+      const roll = Math.random();
+      if (roll > 0.42) continue;
+      // Warm interiors - the lit rooms above the freezing street.
+      ctx.fillStyle = roll > 0.36 ? '#ff9d5c' : '#ffd79a';
+      ctx.fillRect(x * 21 + 5, y * 12.8 + 3.5, 12, 6.5);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * Cold City's skyline.
+ *
+ * Two things, and the contrast between them IS the game: low domed igloos down
+ * at street level, and the Meridian towers standing over them. The story bible
+ * is explicit that the towers have to be visible from every street on Block 9 -
+ * so they're built tall and set back, not dropped onto the block.
+ */
+export function createSkyline(scene) {
+  const city = new THREE.Group();
+  city.name = 'skyline';
+
+  const windows = createWindowTexture();
+
+  // --- the Meridian: bear money, forty floors of it ------------------------
+  const towerSpecs = [
+    { x: -46, z: -150, w: 22, d: 20, h: 96 },
+    { x: -14, z: -168, w: 26, d: 22, h: 124 },  // Whitlock's, the tall one
+    { x: 20, z: -152, w: 20, d: 20, h: 84 },
+    { x: 48, z: -176, w: 24, d: 22, h: 104 },
+    { x: -78, z: -186, w: 20, d: 20, h: 70 },
+    { x: 78, z: -160, w: 18, d: 18, h: 62 },
+    { x: 4, z: -206, w: 30, d: 24, h: 140 },
+    { x: -40, z: -214, w: 22, d: 22, h: 88 },
+  ];
+
+  for (const spec of towerSpecs) {
+    const glass = new THREE.MeshStandardMaterial({
+      color: 0x0d1a2e,
+      roughness: 0.35,
+      metalness: 0.25,
+      emissive: 0xffffff,
+      emissiveMap: windows,
+      emissiveIntensity: 1.5,
+      map: windows,
+    });
+
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), glass);
+    tower.position.set(spec.x, spec.h / 2, spec.z);
+    city.add(tower);
+
+    // A red aircraft light on top of the tall ones, blinking.
+    if (spec.h > 90) {
+      const beacon = new THREE.Mesh(
+        new THREE.SphereGeometry(0.9, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xff4d6a })
+      );
+      beacon.position.set(spec.x, spec.h + 1.5, spec.z);
+      beacon.userData.beacon = true;
+      city.add(beacon);
+    }
+  }
+
+  // --- Igloo Row: where he actually lives ---------------------------------
+  const iglooMat = new THREE.MeshStandardMaterial({
+    color: 0xb9cde4,
+    roughness: 0.97,
+    flatShading: true,
+  });
+  const doorGlow = new THREE.MeshBasicMaterial({ color: 0xffb066 });
+
+  for (let i = 0; i < 22; i++) {
+    // Two rows of domes either side of the street, receding into the fog.
+    const side = i % 2 ? 1 : -1;
+    const along = -38 - Math.floor(i / 2) * 16 - (i % 2) * 7;
+    const radius = 2.9 + ((i * 7) % 5) * 0.45;
+
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 14, 9, 0, Math.PI * 2, 0, Math.PI * 0.5),
+      iglooMat
+    );
+    dome.position.set(side * (19 + ((i * 3) % 6)), 0, along);
+    dome.castShadow = true;
+    dome.receiveShadow = true;
+    city.add(dome);
+
+    // The warm doorway - the only warmth at street level.
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.0, 0.35), doorGlow);
+    door.position.set(dome.position.x - side * radius * 0.86, 0.95, along + 0.6);
+    city.add(door);
+  }
+
+  scene.add(city);
+  return city;
+}
