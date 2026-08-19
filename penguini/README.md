@@ -55,12 +55,32 @@ penguini/
 │   ├── world.js      the ground, the lighting, and the colour palette
 │   └── sky.js        the night sky and the aurora
 ├── data/             dialogue scenes will live here (JSON you can edit yourself)
+├── docs/
+│   └── story-scope.md  the full 20-chapter story - the source for every scene
 ├── public/           images and sounds go here once we have any
 └── vite.config.js    build settings - you rarely need to touch this
 ```
 
 Every file is commented in plain English. If a comment doesn't make sense, that's
 a bug in the comment - say so.
+
+## The story
+
+The whole narrative - four districts, the cast, twenty chapters, four endings -
+is written down in [`docs/story-scope.md`](docs/story-scope.md). That document is
+the source every dialogue scene gets written from. It does not all get built now;
+its own build order says chapter 1 first, then 2-4, then chapter 9, then the rest.
+
+Three things in it change what gets built during Phase 1:
+
+- **The Meridian towers have to be visible from every street on Block 9.** That's
+  the thesis of the game, not a level-design note, so the tall towers get placed
+  on the skyline rather than dropped on the block.
+- **Chapter 1 is the Phase 1 scene** - behind the Krill King, Slick kicks him out
+  of the Frostbite Boys.
+- **Cash / Heat / Cred aren't the only numbers.** The endings hang on two hidden
+  values, Built and Took, so `state.js` tracks those from day one even though
+  nothing displays them.
 
 ## Where we are
 
