@@ -89,7 +89,10 @@ story moment in it.
 
 - [x] Project set up and deploying to GitHub Pages
 - [x] Snowy ground and the aurora night sky
-- [ ] Penguini himself, built from primitives, with a waddle
+- [x] Start screen: Penguini, pistol at the lens, Cold City behind him
+- [x] Model loading — drop a `.glb` into `public/models/` and it replaces the
+      stand-in automatically ([how](public/models/README.md))
+- [ ] Penguini's real 3D model, rigged so he can move
 - [ ] Third-person camera, WASD + mouse on desktop, on-screen stick on mobile
 - [ ] One street block: 8-12 buildings, streetlights, collision
 - [ ] Three interaction points, press E to talk

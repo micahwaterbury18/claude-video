@@ -350,23 +350,23 @@ export function createPenguini() {
   head.add(face);
 
   // Beak, in two halves so he can open his mouth and yell.
-  const beakUpper = new THREE.Mesh(new THREE.ConeGeometry(0.175, 0.50, 4), mat(PENGZ.beak, { flatShading: true }));
+  const beakUpper = new THREE.Mesh(new THREE.ConeGeometry(0.150, 0.34, 4), mat(PENGZ.beak, { flatShading: true }));
   beakUpper.rotation.x = Math.PI / 2;
   beakUpper.rotation.z = Math.PI / 4;
   beakUpper.scale.set(1.05, 1, 0.72);   // slightly wide, still has depth
-  beakUpper.position.set(0, -0.030, 0.600);
+  beakUpper.position.set(0, -0.035, 0.520);
   head.add(beakUpper);
 
   const beakLower = new THREE.Group();          // a hinge, so it swings open
-  beakLower.position.set(0, -0.105, 0.480);
+  beakLower.position.set(0, -0.095, 0.435);
   const beakLowerMesh = new THREE.Mesh(
-    new THREE.ConeGeometry(0.155, 0.42, 4),
+    new THREE.ConeGeometry(0.132, 0.29, 4),
     mat(0xcf8f2c, { flatShading: true })
   );
   beakLowerMesh.rotation.x = Math.PI / 2;
   beakLowerMesh.rotation.z = Math.PI / 4;
   beakLowerMesh.scale.set(1.05, 1, 0.62);
-  beakLowerMesh.position.set(0, -0.005, 0.115);
+  beakLowerMesh.position.set(0, -0.005, 0.085);
   beakLower.add(beakLowerMesh);
 
   // The dark inside of his mouth, visible when he's yelling.
@@ -374,7 +374,7 @@ export function createPenguini() {
   // it rather than dragging a red blob down onto his chest.
   const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), mat(0x51202c, { roughness: 1 }));
   mouth.scale.set(1.15, 0.85, 0.75);
-  mouth.position.set(0, 0.045, -0.02);
+  mouth.position.set(0, 0.035, -0.01);
   beakLower.add(mouth);
   head.add(beakLower);
 

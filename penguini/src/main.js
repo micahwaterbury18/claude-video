@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { createWorld, createSkyline, PALETTE } from './world.js';
 import { createSky } from './sky.js';
 import { createTitleScreen, TITLE_FOV } from './titlescreen.js';
+import { loadPenguini } from './character.js';
 
 const boot = document.getElementById('boot');
 const fatal = document.getElementById('fatal');
@@ -73,10 +74,7 @@ scene.add(sky.mesh);
 // from him and out into the street.
 let mode = 'title';
 let transition = 0;
-
-const title = createTitleScreen(scene, camera, () => {
-  mode = 'leaving';
-});
+let title = null;
 
 // Where the camera ends up once the game starts. This is a placeholder until
 // the third-person camera exists - it just drifts around the block.
@@ -125,6 +123,16 @@ function frame() {
   const delta = Math.min(timer.getDelta(), 0.1);
   const elapsed = timer.getElapsed();
 
+  if (!title) {
+    // Still loading the character. Draw the empty street so there's something
+    // on screen rather than a black rectangle.
+    camera.position.set(0, 6.5, 30);
+    camera.lookAt(0, 5.5, 0);
+    sky.update(elapsed, camera);
+    renderer.render(scene, camera);
+    return;
+  }
+
   if (mode === 'title') {
     title.update(elapsed);
   } else {
@@ -146,25 +154,28 @@ function frame() {
     // Ease the wide title lens back to the normal gameplay one.
     camera.fov = TITLE_FOV + (GAME_FOV - TITLE_FOV) * t;
     camera.updateProjectionMatrix();
-
-    // Fade the title lighting out as we pull away from him.
-    title.lights.rimGreen.intensity = 6 * (1 - t);
-    title.lights.rimPink.intensity = 7 * (1 - t);
-    title.lights.key.intensity = 34 * (1 - t);
-    title.lights.fill.intensity = 13 * (1 - t);
   }
 
   sky.update(elapsed, camera);
   renderer.render(scene, camera);
 }
 
-// Hide the loading text once we've drawn the first real frame.
-requestAnimationFrame(() => {
-  boot.classList.add('gone');
-  setTimeout(() => boot.remove(), 700);
-});
-
 frame();
 
-// Handy for poking at the game from the browser console while developing.
-window.PENGUINI = { scene, camera, renderer, world, sky, title };
+// ---------------------------------------------------------------------------
+// 6. Load Penguini, then open the title screen
+// ---------------------------------------------------------------------------
+loadPenguini().then((character) => {
+  title = createTitleScreen(scene, camera, character, () => {
+    mode = 'leaving';
+  });
+
+  // Only clear the loading screen once he's actually on screen.
+  requestAnimationFrame(() => {
+    boot.classList.add('gone');
+    setTimeout(() => boot.remove(), 700);
+  });
+
+  // Handy for poking at the game from the browser console while developing.
+  window.PENGUINI = { scene, camera, renderer, world, sky, title, character };
+});

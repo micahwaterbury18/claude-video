@@ -5,7 +5,8 @@
 // canvas, which keeps the text razor sharp on every screen.
 
 import * as THREE from 'three';
-import { createPenguini, poseFurious, aimArmAt } from './penguini.js';
+import { poseFurious, aimArmAt } from './penguini.js';
+import { createStreetlights, createNeonSign } from './world.js';
 
 // Where the camera sits for the title shot. Low and close, looking slightly
 // up at him - the angle that makes someone look like a threat.
@@ -13,7 +14,7 @@ import { createPenguini, poseFurious, aimArmAt } from './penguini.js';
 // camera, which is exactly what makes the pistol loom and his head sit back.
 // The gameplay camera goes back to a normal 46 degrees.
 export const TITLE_FOV = 64;
-const TITLE_CAM = { pos: new THREE.Vector3(0.42, 1.06, 2.10), look: new THREE.Vector3(0.0, 1.44, 0) };
+const TITLE_CAM = { pos: new THREE.Vector3(0.42, 1.06, 2.10), look: new THREE.Vector3(0.0, 1.38, 0) };
 
 /** Build the HTML that sits over the 3D view. */
 function createOverlay() {
@@ -123,60 +124,64 @@ function createOverlay() {
 /**
  * Set up the title screen.
  *
+ * Deliberately lit by nothing but the street: one streetlamp and the neon sign
+ * over the Krill King, both of which are real objects in the world. No special
+ * title-only lighting rig. That means what you see on this screen is honestly
+ * what the game looks like - if the opening shot flatters him, the game would
+ * be a let-down, and that trade is never worth making.
+ *
  * @param {THREE.Scene} scene
  * @param {THREE.PerspectiveCamera} camera
+ * @param {object} character from loadPenguini(): { root, parts, source }
  * @param {Function} onStart called when the player hits the button
  */
-export function createTitleScreen(scene, camera, onStart) {
-  // --- Penguini, posed and lit for his close-up ---------------------------
-  const model = createPenguini();
-  poseFurious(model);
+export function createTitleScreen(scene, camera, character, onStart) {
+  const { root, parts } = character;
 
-  // Stand him just off-centre so the title has room, and turn him to face the
-  // lens with a bit of attitude in the angle.
-  model.root.position.set(0.30, 0, 0.35);
-  model.root.rotation.y = -0.16;
-  scene.add(model.root);
+  // Frame whoever turned up. Aiming at his actual eyeline means dropping in a
+  // model with different proportions gives a sensible shot straight away
+  // instead of a picture of his chest.
+  TITLE_CAM.look.y = character.eyeHeight ?? 1.38;
+  TITLE_CAM.pos.y = (character.eyeHeight ?? 1.38) - 0.32;
 
-  // Aim the arm straight at the lens so the pistol ends up right in front of
-  // the camera - that's what makes it loom.
-  const aimPoint = TITLE_CAM.pos.clone().add(new THREE.Vector3(-0.72, -0.52, 0.30));
-  scene.updateMatrixWorld(true);
-  aimArmAt(model.parts.armR, aimPoint, -0.28);
+  root.position.set(0.30, 0, 0.35);
+  root.rotation.y = -0.16;
+  scene.add(root);
 
-  // Then swing the muzzle across the frame WITHOUT moving the gun. A barrel
-  // pointed dead-on is a featureless dark rectangle; turned side-on you read
-  // the whole shape of the pistol and it still feels levelled at you.
-  model.parts.pistol.rotation.y = 1.02;
+  // The stand-in is assembled from shapes we control, so we can pose it. A
+  // loaded model has its own rig and gets posed through that instead, once it
+  // has one - so everything here is optional.
+  if (parts) {
+    poseFurious(character);
 
-  // --- lighting ------------------------------------------------------------
-  // Note for later: three.js checks a light's `layers` against the CAMERA, not
-  // against each object, so you cannot use layers to keep a light off the
-  // ground. The way to control spill is distance and position - keep the lamps
-  // close to him and they fall off before they reach much snow.
+    // Aim the arm at the lens so the pistol ends up right in front of the
+    // camera - that's what makes it loom.
+    const aimPoint = TITLE_CAM.pos.clone().add(new THREE.Vector3(-0.72, -0.52, 0.30));
+    scene.updateMatrixWorld(true);
+    aimArmAt(parts.armR, aimPoint, -0.28);
 
-  // Two rim lights in the game's accent colours, tucked in behind him. They
-  // draw a bright edge down his silhouette so he doesn't sink into the sky.
-  const rimGreen = new THREE.PointLight(0x3ff0c2, 6, 2.6, 2);
-  rimGreen.position.set(-1.15, 2.05, -0.65);
-  scene.add(rimGreen);
+    // Swing the muzzle across the frame without moving the gun: a barrel
+    // pointed dead-on is a featureless rectangle, but turned side-on you read
+    // the whole shape of the pistol and it still feels levelled at you.
+    parts.pistol.rotation.y = 1.02;
+  }
 
-  const rimPink = new THREE.PointLight(0xff4d8d, 7, 2.6, 2);
-  rimPink.position.set(1.45, 1.75, -0.55);
-  scene.add(rimPink);
+  // --- the only lighting: the street itself --------------------------------
+  const lamps = createStreetlights(scene, [
+    // Close, behind and to his left: the reason there's a warm edge down one
+    // side of him.
+    { x: -3.15, z: -2.30, face: 1, intensity: 40, shadows: true },
+    // In front and to his right, out of shot. Without a lamp on this side
+    // nothing lights his face and he reads as a dark shape.
+    { x: 4.10, z: 2.60, face: -1, intensity: 34 },
+    // Further down the block, purely for depth.
+    { x: 7.5, z: -14, face: -1, intensity: 22 },
+    { x: -8.5, z: -26, face: 1, intensity: 22 },
+  ]);
 
-  // Cold key from camera-left: this is the light doing the actual work on his
-  // face, his beak and the side of the pistol.
-  const key = new THREE.SpotLight(0xf2f7ff, 34, 7.5, 0.55, 0.62, 2);
-  key.position.set(-0.95, 2.25, 2.45);
-  key.target = model.root;
-  scene.add(key);
-  scene.add(key.target);
-
-  // A soft fill from beside the camera so his front never goes to mud.
-  const fill = new THREE.PointLight(0xdfe9fa, 13, 5.5, 2);
-  fill.position.set(0.75, 1.45, 2.25);
-  scene.add(fill);
+  // The Krill King's sign, off to his right. Hot pink, so he picks up the
+  // colour of the criminal world along that edge.
+  const sign = createNeonSign(scene, new THREE.Vector3(2.85, 2.55, -1.35));
 
   camera.fov = TITLE_FOV;
   camera.updateProjectionMatrix();
@@ -200,19 +205,19 @@ export function createTitleScreen(scene, camera, onStart) {
   window.addEventListener('keydown', start, { once: true });
 
   return {
-    model,
-    lights: { rimGreen, rimPink, key, fill },
+    character,
+    lamps,
+    sign,
     camera: TITLE_CAM,
     /** Called every frame: a slow breathing sway so the shot isn't a photo. */
     update(elapsed) {
       if (leaving) return;
-      // A slow breathing sway. Small numbers on purpose - any more and he
-      // looks like he's on a boat.
-      const sway = Math.sin(elapsed * 0.9) * 0.016;
-      model.root.rotation.y = -0.16 + sway;
-      model.root.position.y = Math.abs(Math.sin(elapsed * 1.8)) * 0.012;
-      // He's too angry to hold the gun perfectly still.
-      model.parts.armR.rotation.z += Math.sin(elapsed * 2.6) * 0.0016;
+      // Small numbers on purpose - any more and he looks like he's on a boat.
+      root.rotation.y = -0.16 + Math.sin(elapsed * 0.9) * 0.016;
+      root.position.y = Math.abs(Math.sin(elapsed * 1.8)) * 0.012;
+      // The neon flickers, because it's a cheap sign on a cheap block.
+      const flicker = 0.86 + 0.14 * Math.sin(elapsed * 21.0) * Math.sin(elapsed * 3.3);
+      sign.glow.intensity = 14 * flicker;
     },
   };
 }

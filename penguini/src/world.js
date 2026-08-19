@@ -91,12 +91,12 @@ function createGround() {
 function createLights(scene) {
   // Sky light: aurora green pouring down from above, navy bouncing up off the
   // ground. This one light does most of the work in selling "arctic night".
-  const hemi = new THREE.HemisphereLight(PALETTE.aurora, PALETTE.night, 0.16);
+  const hemi = new THREE.HemisphereLight(0x8fd7cd, PALETTE.night, 0.30);
   scene.add(hemi);
 
   // The moon. Cold, pale blue, low in the sky, off to one side so everything
   // casts a long shadow.
-  const moon = new THREE.DirectionalLight(0xc3dcff, 0.70);
+  const moon = new THREE.DirectionalLight(0xc9dfff, 0.85);
   moon.position.set(-70, 90, 40);
   moon.castShadow = true;
   moon.shadow.mapSize.set(2048, 2048);
@@ -251,4 +251,85 @@ export function createSkyline(scene) {
 
   scene.add(city);
   return city;
+}
+
+/**
+ * Streetlights along Block 9.
+ *
+ * These are real lights in the world, not decoration - they're what makes the
+ * street readable at night, and they're what lights Penguini when he's stood
+ * under one. The title screen deliberately uses these and nothing else, so the
+ * opening shot is lit by the same lamps as the gameplay.
+ */
+export function createStreetlights(scene, positions) {
+  const group = new THREE.Group();
+  group.name = 'streetlights';
+
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x232a36, roughness: 0.85 });
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xffd7a0 });
+
+  const lights = [];
+
+  for (const spot of positions) {
+    const post = new THREE.Group();
+    post.position.set(spot.x, 0, spot.z);
+
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 5.2, 8), poleMat);
+    pole.position.y = 2.6;
+    pole.castShadow = true;
+    post.add(pole);
+
+    // The arm that reaches out over the street.
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.1, 6), poleMat);
+    arm.rotation.z = Math.PI / 2;
+    arm.position.set(spot.face * 0.55, 5.1, 0);
+    post.add(arm);
+
+    // The glowing lamp head. MeshBasicMaterial ignores lighting, so it stays
+    // bright - that's what sells it as the source rather than a lit object.
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.20, 12, 10), lampMat);
+    head.position.set(spot.face * 1.05, 4.98, 0);
+    post.add(head);
+
+    // The light itself: warm, and falling off fast so each lamp owns a pool of
+    // snow instead of washing out the whole block.
+    const bulb = new THREE.PointLight(0xffc98a, spot.intensity ?? 26, 16, 2);
+    bulb.position.set(spot.face * 1.05, 4.9, 0);
+    bulb.castShadow = spot.shadows ?? false;
+    if (bulb.castShadow) {
+      bulb.shadow.mapSize.set(1024, 1024);
+      bulb.shadow.camera.far = 18;
+      bulb.shadow.bias = -0.004;
+    }
+    post.add(bulb);
+    lights.push(bulb);
+
+    group.add(post);
+  }
+
+  scene.add(group);
+  return { group, lights };
+}
+
+/**
+ * The neon sign over the Krill King - hot pink, the colour this game uses for
+ * the criminal world. It's a light as well as a prop, so anyone stood near it
+ * picks up a pink edge for free.
+ */
+export function createNeonSign(scene, position) {
+  const group = new THREE.Group();
+  group.position.copy(position);
+
+  const tube = new THREE.Mesh(
+    new THREE.BoxGeometry(2.6, 0.14, 0.10),
+    new THREE.MeshBasicMaterial({ color: PALETTE.pink })
+  );
+  group.add(tube);
+
+  const glow = new THREE.PointLight(PALETTE.pink, 14, 9, 2);
+  glow.position.set(0, -0.2, 0.4);
+  group.add(glow);
+
+  scene.add(group);
+  return { group, glow };
 }
