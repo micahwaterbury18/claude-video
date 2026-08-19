@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit + user-scalable=no stops phones from zooming when you drag -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0a1624" />
+    <meta name="description" content="PENGUINI - Cold City" />
+    <title>PENGUINI</title>
+    <style>
+      /* Reset: the game canvas fills the whole screen, nothing scrolls. */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        /* Deep navy night - the base colour of the whole game.
+           Set here too so there's no white flash before Three.js starts. */
+        background: #0a1624;
+        color: #eaf4ff;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        /* Stops the browser trying to scroll/zoom when you drag on the canvas. */
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      /* Little corner label so you can tell at a glance which build you're on. */
+      #brand {
+        position: fixed;
+        top: max(14px, env(safe-area-inset-top));
+        left: max(14px, env(safe-area-inset-left));
+        z-index: 10;
+        pointer-events: none;
+        letter-spacing: 0.34em;
+        font-size: 13px;
+        font-weight: 700;
+        color: #eaf4ff;
+        text-shadow: 0 0 18px rgba(63, 240, 194, 0.55);
+      }
+
+      #brand span {
+        display: block;
+        margin-top: 6px;
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.22em;
+        color: #3ff0c2;
+        opacity: 0.75;
+      }
+
+      /* Shown while Three.js boots, then removed by main.js. */
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0a1624;
+        color: #3ff0c2;
+        font-size: 12px;
+        letter-spacing: 0.3em;
+        transition: opacity 0.6s ease;
+      }
+
+      #boot.gone {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* If the browser can't do 3D at all, say so in plain English. */
+      #fatal {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+        text-align: center;
+        line-height: 1.6;
+        background: #0a1624;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="brand">PENGUINI<span>COLD CITY</span></div>
+    <div id="boot">LOADING COLD CITY</div>
+    <div id="fatal">
+      This game needs WebGL, which your browser has turned off or doesn't
+      support. Try Chrome or Safari, or check your browser's graphics settings.
+    </div>
+
+    <!-- This one line loads the whole game. -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

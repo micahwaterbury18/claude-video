@@ -22,6 +22,15 @@ Agent Skills package that gives an agent a video input. Installable across Claud
 - **Path resolution is harness-agnostic.** SKILL.md resolves `SKILL_DIR` as the directory of the SKILL.md the model just Read, then runs `${SKILL_DIR}/scripts/...`. Do NOT reintroduce `${CLAUDE_SKILL_DIR}` (Claude-Code-only) — it is unset on Codex/Cursor/agents and breaks every script call there.
 - **No `commands/` wrapper.** `/watch` is derived from SKILL.md frontmatter (`name: watch` + `user-invocable: true`). A separate command file creates a duplicate slash command.
 
+## Unrelated: `penguini/`
+
+`penguini/` is a separate Three.js + Vite browser game (PENGUINI, Cold City) that
+shares this repo but shares no code with the watch skill. It has its own
+`package.json`, its own README, and its own Pages deploy
+(`.github/workflows/deploy-penguini.yml`). Skill work and game work do not touch
+each other — the skill's pytest suite ignores it, and the game's build ignores
+the skill.
+
 ## Install surfaces
 
 | Surface | Install |

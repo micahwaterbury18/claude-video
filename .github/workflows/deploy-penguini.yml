@@ -1,0 +1,66 @@
+# Builds PENGUINI and publishes it to GitHub Pages.
+#
+# This runs on GitHub's computers, not yours. Every time you push code, it
+# installs the tools, builds the game, and puts the result on the web.
+name: Deploy PENGUINI
+
+on:
+  push:
+    branches:
+      - main
+      - claude/penguini-initial-setup-rxiemf
+    # Only bother rebuilding when the game (or this file) actually changed.
+    paths:
+      - "penguini/**"
+      - ".github/workflows/deploy-penguini.yml"
+  # Lets you press a button on the Actions tab to redeploy by hand.
+  workflow_dispatch:
+
+# Permissions the deploy needs. Nothing more.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# If you push twice quickly, let the second build finish and skip the first.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: penguini/package-lock.json
+
+      - name: Install the game's libraries
+        working-directory: penguini
+        run: npm ci
+
+      - name: Build the game
+        working-directory: penguini
+        run: npm run build
+
+      - name: Hand the built files to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: penguini/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4
