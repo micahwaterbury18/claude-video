@@ -92,27 +92,37 @@ function createTeeGraphic() {
   return texture;
 }
 
-/** The beanie, with the rolled brim. */
+/**
+ * The beanie.
+ *
+ * The numbers here are worked out from the size of his skull rather than
+ * guessed: his head is a sphere of radius 0.47, so a cap of radius 0.482
+ * stopping 54 degrees down from the top meets the skull at y = 0.283, which
+ * is exactly where the brim goes. Fudge these and you get either a floating
+ * ring or a hat pulled down over his eyes.
+ */
 function createBeanie() {
   const group = new THREE.Group();
   const black = mat(0x1c1c24, { roughness: 0.95 });
 
-  // The dome of the hat. It only covers the crown - pull it any lower and it
-  // swallows his eyes, which is where the whole performance lives.
+  const CAP_RADIUS = 0.482;
+  const CAP_SWEEP = Math.PI * 0.30;          // 54 degrees down from the crown
+  const BRIM_Y = CAP_RADIUS * Math.cos(CAP_SWEEP);
+  const BRIM_RADIUS = CAP_RADIUS * Math.sin(CAP_SWEEP);
+
   const cap = new THREE.Mesh(
-    new THREE.SphereGeometry(0.475, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.42),
+    new THREE.SphereGeometry(CAP_RADIUS, 24, 16, 0, Math.PI * 2, 0, CAP_SWEEP),
     black
   );
   group.add(cap);
 
-  // The thick rolled-up brim, sitting right on the join.
-  const brim = new THREE.Mesh(new THREE.TorusGeometry(0.455, 0.062, 12, 28), black);
+  const brim = new THREE.Mesh(new THREE.TorusGeometry(BRIM_RADIUS, 0.058, 12, 28), black);
   brim.rotation.x = Math.PI / 2;
+  brim.position.y = BRIM_Y;
   group.add(brim);
 
-  // The little seam on top.
-  const top = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 10), black);
-  top.position.y = 0.235;
+  const top = new THREE.Mesh(new THREE.SphereGeometry(0.058, 12, 10), black);
+  top.position.y = CAP_RADIUS + 0.02;
   group.add(top);
 
   group.traverse((o) => { o.castShadow = true; });
@@ -258,6 +268,30 @@ function createPistol() {
 }
 
 /**
+ * Beak geometry.
+ *
+ * Rotating a cone by setting mesh.rotation gets confusing fast, because the
+ * scale is applied before the rotation - which is how earlier versions of this
+ * ended up as a flat arrowhead and then a lightning bolt. So the shape is baked
+ * into the geometry here, in an order that can only mean one thing:
+ *
+ *   1. spin it about its own length so it sits flat-side-up, not corner-up
+ *   2. tip it over so it points forward (+Z) instead of up
+ *   3. squash its height - by now "height" genuinely is up and down
+ *
+ * @param {number} radius half the width of the beak at its base
+ * @param {number} length how far it sticks out from his face
+ * @param {number} flatness 1 = as tall as it is wide, lower = flatter
+ */
+function beakGeometry(radius, length, flatness) {
+  const geometry = new THREE.ConeGeometry(radius, length, 4);
+  geometry.rotateY(Math.PI / 4);
+  geometry.rotateX(Math.PI / 2);
+  geometry.scale(1, flatness, 1);
+  return geometry;
+}
+
+/**
  * Build Penguini.
  *
  * Returns the whole model plus handles on the parts that move, so other files
@@ -343,93 +377,101 @@ export function createPenguini({ shades: wearShades = false } = {}) {
   skull.castShadow = true;
   head.add(skull);
 
-  // The white face patch penguins have.
+  // The white face patch. It sits low and forward, so his eyes are on white
+  // and the top of his head stays black under the hat.
   const face = new THREE.Mesh(new THREE.SphereGeometry(0.445, 24, 18), mat(PENGZ.belly));
-  face.scale.set(0.86, 0.78, 0.70);
-  face.position.set(0, -0.12, 0.17);
+  face.scale.set(0.86, 0.80, 0.70);
+  face.position.set(0, -0.10, 0.175);
   head.add(face);
 
-  // Beak, in two halves so he can open his mouth and yell.
-  const beakUpper = new THREE.Mesh(new THREE.ConeGeometry(0.150, 0.34, 4), mat(PENGZ.beak, { flatShading: true }));
-  beakUpper.rotation.x = Math.PI / 2;
-  beakUpper.rotation.z = Math.PI / 4;
-  beakUpper.scale.set(1.05, 1, 0.72);   // slightly wide, still has depth
-  beakUpper.position.set(0, -0.035, 0.520);
-  head.add(beakUpper);
+  // --- the face, laid out top to bottom -----------------------------------
+  // Everything below is spaced off these three heights. The rule that matters:
+  // the beak goes BELOW the eyes, not between them. Level with the eyes it
+  // reads as a giant nose and the whole face falls apart.
+  const BROW_Y = 0.166;
+  const EYE_Y = 0.078;
+  const BEAK_Y = -0.048;
 
-  const beakLower = new THREE.Group();          // a hinge, so it swings open
-  beakLower.position.set(0, -0.095, 0.435);
-  const beakLowerMesh = new THREE.Mesh(
-    new THREE.ConeGeometry(0.132, 0.29, 4),
-    mat(0xcf8f2c, { flatShading: true })
-  );
-  beakLowerMesh.rotation.x = Math.PI / 2;
-  beakLowerMesh.rotation.z = Math.PI / 4;
-  beakLowerMesh.scale.set(1.05, 1, 0.62);
-  beakLowerMesh.position.set(0, -0.005, 0.085);
-  beakLower.add(beakLowerMesh);
-
-  // The dark inside of his mouth, visible when he's yelling.
-  // The dark of his throat. It lives at the hinge, so opening the beak reveals
-  // it rather than dragging a red blob down onto his chest.
-  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), mat(0x51202c, { roughness: 1 }));
-  mouth.scale.set(1.15, 0.85, 0.75);
-  mouth.position.set(0, 0.035, -0.01);
-  beakLower.add(mouth);
-  head.add(beakLower);
-
-  // Eyes.
+  // Eyes. Mostly white with a small pupil - a big pupil turns the eye into a
+  // black ball and he loses all expression.
   const eyes = new THREE.Group();
   const pupils = [];
   for (const side of [-1, 1]) {
-    const white = new THREE.Mesh(new THREE.SphereGeometry(0.098, 16, 14), mat(0xfdfdfd, { roughness: 0.35 }));
-    white.position.set(side * 0.163, 0.010, wearShades ? 0.330 : 0.375);
-    white.scale.set(1, 1.0, 0.66);
+    const white = new THREE.Mesh(new THREE.SphereGeometry(0.076, 18, 14), mat(0xfcfdff, { roughness: 0.34 }));
+    white.position.set(side * 0.118, EYE_Y, 0.396);
+    white.scale.set(1, 1.02, 0.68);
     eyes.add(white);
 
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.047, 12, 10), mat(0x101318, { roughness: 0.3 }));
-    pupil.position.set(side * 0.168, -0.008, wearShades ? 0.390 : 0.432);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.031, 12, 10), mat(0x0e1116, { roughness: 0.42 }));
+    pupil.scale.set(1, 1, 0.62);   // flattened so it sits ON the eye, not out of it
+    pupil.position.set(side * 0.111, EYE_Y - 0.010, 0.450);
     eyes.add(pupil);
     pupils.push(pupil);
   }
   head.add(eyes);
 
-  // Eyebrows. These do almost all the work of the expression.
+  // Eyebrows, in the gap between the brim and his eyes. These carry the
+  // expression - drop the inner ends and he's furious, raise them and he's
+  // pleading, and it's the same two boxes either way.
   const brows = new THREE.Group();
   for (const side of [-1, 1]) {
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.048, 0.05), mat(0x14161d));
-    brow.position.set(side * 0.170, 0.135, 0.430);
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.175, 0.044, 0.05), mat(0x14161d));
+    brow.position.set(side * 0.118, BROW_Y, 0.432);
     brow.userData.side = side;
     brows.add(brow);
   }
   head.add(brows);
 
-  // The white shades, pushed up onto the beanie. Down over the eyes they hide
-  // his expression, and right now his expression is the whole point.
+  // Beak. Small: about a fifth of the width of his head. The earlier version
+  // was three times this and swallowed his whole face.
+  const beakUpper = new THREE.Mesh(
+    beakGeometry(0.175, 0.44, 0.60),
+    mat(PENGZ.beak, { flatShading: true })
+  );
+  beakUpper.position.set(0, BEAK_Y, 0.455);
+  head.add(beakUpper);
+
+  // The lower half hinges from the corner of his mouth, just under the upper
+  // half, so opening it reads as a jaw rather than a second beak.
+  const beakLower = new THREE.Group();
+  beakLower.position.set(0, BEAK_Y - 0.014, 0.400);
+  const beakLowerMesh = new THREE.Mesh(
+    beakGeometry(0.155, 0.36, 0.52),
+    mat(0xcf8f2c, { flatShading: true })
+  );
+  beakLowerMesh.position.set(0, -0.006, 0.100);
+  beakLower.add(beakLowerMesh);
+
+  // The dark of his throat, at the hinge, revealed when the jaw drops.
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), mat(0x51202c, { roughness: 1 }));
+  mouth.scale.set(1.3, 0.55, 0.7);
+  mouth.position.set(0, 0.026, 0.030);
+  beakLower.add(mouth);
+  head.add(beakLower);
+
+  // The shades, for when he's wearing them.
   const shades = new THREE.Group();
-  // Very slightly see-through, so his furious eyes read as a ghost behind the
-  // lenses instead of being hidden completely.
-  const lensMat = mat(0xffffff, {
-    roughness: 0.20,
-    extra: { transparent: true, opacity: 0.93 },
-  });
+  const lensMat = mat(0xffffff, { roughness: 0.20, extra: { transparent: true, opacity: 0.93 } });
   for (const side of [-1, 1]) {
     const lens = new THREE.Mesh(new THREE.SphereGeometry(0.086, 16, 12), lensMat);
     lens.scale.set(1.34, 0.60, 0.30);
-    lens.position.set(side * 0.142, 0, 0.325);
+    lens.position.set(side * 0.150, 0, 0.330);
     shades.add(lens);
   }
   const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.030, 0.045), lensMat);
-  bridge.position.set(0, 0.002, 0.335);
+  bridge.position.set(0, 0.002, 0.340);
   shades.add(bridge);
-  shades.position.set(0, 0.055, 0.130);
+  shades.position.set(0, EYE_Y, 0.105);
   shades.rotation.x = -0.06;
   // Off by default - you can read his face without them, and the anger is the
   // point. Pass { shades: true } to createPenguini() to put them back on.
   if (wearShades) head.add(shades);
 
   const beanie = createBeanie();
-  beanie.position.y = 0.205;
+  // Sits at the head's own origin: createBeanie() works its size out from the
+  // skull radius, so it only lines up when the two share a centre. Offsetting
+  // it leaves the hat hovering above him like a halo.
+  beanie.position.y = 0;
   head.add(beanie);
 
   const dreads = createDreads();
@@ -519,12 +561,13 @@ export function poseFurious(model) {
   torso.rotation.y = 0.10;
 
   // Mouth wide open. This is the yell.
-  beakLower.rotation.x = 0.52;
+  beakLower.rotation.x = 0.20;
 
   // Brows driven down hard toward the middle of his face. Anger, in one line.
   brows.children.forEach((brow) => {
     const side = brow.userData.side;
-    brow.rotation.z = side * -0.60;
-    brow.position.y = 0.100;
+    brow.rotation.z = side * -0.46;
+    brow.position.y = 0.152;
+    brow.position.x = side * 0.110;
   });
 }
