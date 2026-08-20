@@ -1,78 +1,52 @@
-// player.js - Penguini as something you steer, plus the camera that watches him.
+// player.js - moving Penguini, and the camera that watches him.
 //
-// Two decisions here shape how the whole game feels, so they're at the top
-// where you can find them:
+// The one rule that keeps this working:
 //
-//   1. He has momentum. Push and he takes a moment to get going; let go and he
-//      slides to a stop. Turning has a radius - he leans into it rather than
-//      pivoting on the spot. A waddle needs a beat to be funny, and a penguin
-//      who turns instantly reads as a robot.
-//   2. The waddle is big. Full side-to-side roll, enough that walking in a
-//      straight line looks like an achievement.
+//   cameraRig.yaw is written ONLY by drag input.
 //
-// Both are free to change: every number below is named, and none of them are
-// buried in the maths.
+// Never set it from the player's facing, and never set the player's facing
+// straight from it. The stick is read relative to the camera, so if the camera
+// also chased the player's facing the two would feed each other and he'd spin
+// on the spot. They are deliberately separate.
+//
+// The direction the stick means is taken from the camera itself, via
+// getWorldDirection, rather than rebuilt from an angle with sines and cosines.
+// That's not a style preference: a hand-written version of that formula is how
+// "up" ended up walking him backwards, and the version below cannot get the
+// sign wrong because it asks the camera where it is actually looking.
 
 import * as THREE from 'three';
 import { resolveCollisions } from './world.js';
 
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const _fwd = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _offset = new THREE.Vector3();
+const _target = new THREE.Vector3();
+
+export const cameraRig = {
+  yaw: 0,            // radians - ONLY drag input writes this
+  pitch: 0.25,
+  distance: 7,
+  height: 1.6,
+};
+
 export const MOVEMENT = {
-  walkSpeed: 2.5,        // metres per second at a gentle push
-  runSpeed: 5.4,         // ...and at a full one
-  acceleration: 7.0,     // how quickly he reaches that speed (per second)
-  braking: 6.0,          // how quickly he stops when you let go (per second)
-  turnRate: 6.5,         // radians per second - lower feels heavier
-  radius: 0.55,          // how fat he is, for bumping into buildings
+  speed: 4.5,           // metres per second at a full push
+  turnSharpness: 12,    // higher = he snaps round faster
+  radius: 0.55,         // how fat he is, for bumping into buildings
 };
 
 export const WADDLE = {
-  roll: 0.20,            // radians of side-to-side lean, about 11 degrees
-  bob: 0.055,            // how far he rises and falls, in metres
-  wag: 0.09,             // a little yaw shimmy on top
-  stepsPerMetre: 1.15,   // tied to distance travelled, not to time, so the
-                         // waddle can never desync from how fast he's going
+  roll: 0.20,           // radians of side-to-side lean, about 11 degrees
+  bob: 0.055,           // how far he rises and falls, in metres
+  wag: 0.09,            // a little yaw shimmy on top
+  stepsPerMetre: 1.15,  // tied to distance walked, not to time, so the waddle
+                        // can never desync from how fast he's going
 };
 
-export const CAMERA = {
-  distance: 5.4,
-  height: 2.5,
-  lookHeight: 1.35,
-  followRate: 4.2,       // how fast the camera catches up to him
-  swingRate: 2.0,        // how fast it swings round behind him while you steer
-  settleRate: 1.1,       // ...and once you let go
-  holdAngle: 2.2,        // ~126 degrees. Turn harder than this away from the
-                         // camera and it stops chasing, so the controls can't
-                         // change meaning under your thumb.
-};
-
-/**
- * Turn a push on the stick into a direction in the world.
- *
- * Up on the stick means away from the camera, and right means right of screen.
- * That's what makes a third-person scheme feel natural instead of like
- * steering a remote-control car that's pointed back at you.
- *
- * The camera sits at   player - (sin yaw, cos yaw) * distance
- * so walking away from it is   (sin yaw,  cos yaw)
- * and screen-right is          (-cos yaw, sin yaw)
- *
- * Screen coordinates count downward, so "up on the stick" is a negative y.
- *
- * @param {number} x stick left/right, -1 to 1
- * @param {number} y stick up/down, -1 to 1, positive is DOWN the screen
- * @param {number} yaw which way the camera is looking
- * @param {THREE.Vector3} out written in place
- */
-export function stickToWorld(x, y, yaw, out) {
-  const sin = Math.sin(yaw);
-  const cos = Math.cos(yaw);
-  const forward = -y;
-  return out.set(
-    -x * cos + forward * sin,
-    0,
-    x * sin + forward * cos
-  );
-}
+const LOOK_SENSITIVITY = 0.005;
 
 /**
  * Reset his arms out of the title-screen pose into something he can walk in.
@@ -95,164 +69,113 @@ export function poseWalking(parts) {
   if (parts.pistol) parts.pistol.visible = false;
 }
 
+/** Put him on the street, facing down it, with the camera behind him. */
+export function placePlayer(player, world) {
+  player.position.set(0, world.groundHeightAt(0, 6), 6);
+  player.rotation.set(0, Math.PI, 0);   // he faces -z, down the block
+  cameraRig.yaw = 0;                    // so the camera sits on the +z side
+  player.userData.stride = 0;
+  player.userData.moving = false;
+}
+
+/** Where the camera wants to sit, without moving it. Used by the title fly-in. */
+export function computeCameraTarget(player, out) {
+  const cp = Math.cos(cameraRig.pitch);
+  _offset.set(
+    Math.sin(cameraRig.yaw) * cp,
+    Math.sin(cameraRig.pitch) + 0.5,
+    Math.cos(cameraRig.yaw) * cp
+  ).multiplyScalar(cameraRig.distance);
+  return out.copy(player.position).setY(player.position.y + cameraRig.height).add(_offset);
+}
+
+/** The point on him the camera aims at. */
+export function computeLookTarget(player, out) {
+  return out.copy(player.position).setY(player.position.y + cameraRig.height);
+}
+
 /**
- * Make Penguini playable.
- *
- * @param {object} character from loadPenguini()
- * @param {object} world from createWorld()
- * @param {Array} colliders from createBlock()
+ * Move him. Call this BEFORE updateCamera, so he moves using the basis you
+ * could actually see last frame.
  */
-export function createPlayer(character, world, colliders) {
-  const root = character.root;
-  const parts = character.parts;
+export function updatePlayer(player, camera, controls, dt, world, colliders) {
+  const input = controls.getMove();
 
-  poseWalking(parts);
+  // The camera's own axes, flattened onto the ground.
+  camera.getWorldDirection(_fwd);
+  _fwd.y = 0;
+  if (_fwd.lengthSq() < 1e-6) return;   // camera pointing straight down
+  _fwd.normalize();
+  _right.crossVectors(_fwd, WORLD_UP).normalize();
 
-  // Put him in the middle of the street, facing down it - and stood ON the
-  // snow, not at zero, or he's buried up to the knees during the fly-out.
-  root.position.set(0, world.groundHeightAt(0, 6), 6);
-  root.rotation.set(0, Math.PI, 0);
+  _dir.set(0, 0, 0)
+    .addScaledVector(_right, input.x)
+    .addScaledVector(_fwd, input.y);
 
-  const velocity = new THREE.Vector3();
-  let facing = Math.PI;        // the direction he's actually pointing
-  let cameraYaw = Math.PI;     // the direction the camera is looking from
-  let stride = 0;              // how far he's walked, in "steps"
-  let bodyY = world.groundHeightAt(0, 6);   // ground height under his feet
+  const moving = _dir.lengthSq() > 1e-6;
+  player.userData.moving = moving;
 
-  // Reused each frame so we're not creating objects 60 times a second.
-  const wanted = new THREE.Vector3();
-  const cameraTarget = new THREE.Vector3();
-  const lookTarget = new THREE.Vector3();
-
-  /** Where the camera wants to sit, given where he is right now. */
-  function computeCameraTarget(out) {
-    out.set(
-      root.position.x - Math.sin(cameraYaw) * CAMERA.distance,
-      bodyY + CAMERA.height,
-      root.position.z - Math.cos(cameraYaw) * CAMERA.distance
-    );
-    // Never let it sink under the snow.
-    const groundAtCamera = world.groundHeightAt(out.x, out.z);
-    out.y = Math.max(out.y, groundAtCamera + 1.2);
-    return out;
+  if (moving) {
+    // Normalising before scaling by magnitude is what stops diagonals being
+    // 1.4x faster than straight lines.
+    _dir.normalize();
+    player.position.addScaledVector(_dir, MOVEMENT.speed * input.magnitude * dt);
+    resolveCollisions(player.position, MOVEMENT.radius, colliders);
   }
 
-  /** The point on him the camera should be aimed at. */
-  function computeLookTarget(out) {
-    return out.set(root.position.x, bodyY + CAMERA.lookHeight, root.position.z);
+  // --- facing ------------------------------------------------------------
+  // Written from the direction he's travelling. Never from the camera.
+  let facing = player.userData.facing ?? player.rotation.y;
+  if (moving) {
+    const targetYaw = Math.atan2(_dir.x, _dir.z);
+    let difference = targetYaw - facing;
+    while (difference > Math.PI) difference -= Math.PI * 2;
+    while (difference < -Math.PI) difference += Math.PI * 2;
+    facing += difference * Math.min(1, MOVEMENT.turnSharpness * dt);
   }
+  player.userData.facing = facing;
 
-  return {
-    root,
-    get position() { return root.position; },
-    // The direction he's actually steering. Deliberately separate from
-    // root.rotation.y, which has the waddle's shimmy mixed into it.
-    get facing() { return facing; },
-    get cameraYaw() { return cameraYaw; },
-    // The title screen's fly-in asks for both of these so it can arrive
-    // exactly where gameplay starts, and hand over without a jump.
-    computeCameraTarget,
-    computeLookTarget,
+  // --- the waddle --------------------------------------------------------
+  const speed = moving ? MOVEMENT.speed * input.magnitude : 0;
+  player.userData.stride = (player.userData.stride ?? 0)
+    + speed * dt * WADDLE.stepsPerMetre * Math.PI;
+  const stride = player.userData.stride;
 
-    /**
-     * @param {number} delta seconds since the last frame
-     * @param {object} input from createInput().update()
-     * @param {THREE.PerspectiveCamera} camera
-     */
-    update(delta, input, camera) {
-      stickToWorld(input.x, input.y, cameraYaw, wanted);
+  // Fade it out as he slows, so a standing penguin doesn't rock.
+  const swing = Math.min(1, speed / MOVEMENT.speed);
+  const roll = Math.sin(stride) * WADDLE.roll * swing;
+  const bob = Math.abs(Math.sin(stride)) * WADDLE.bob * swing;
+  const wag = Math.sin(stride) * WADDLE.wag * swing;
 
-      const pushing = input.strength > 0.01;
-      const topSpeed = input.running ? MOVEMENT.runSpeed : MOVEMENT.walkSpeed;
+  // Follow the bumps in the snow instead of skating over them.
+  const ground = world.groundHeightAt(player.position.x, player.position.z);
+  player.position.y = ground + bob;
+  player.rotation.set(0, facing + wag, roll);
 
-      // Easing toward a target has to account for how long the frame was, or
-      // the game literally moves faster on a faster computer. Doing it through
-      // exp() is the standard fix: the result is identical whether the frame
-      // took 5 milliseconds or 50.
-      if (pushing) {
-        wanted.normalize().multiplyScalar(topSpeed * input.strength);
-        velocity.lerp(wanted, 1 - Math.exp(-MOVEMENT.acceleration * delta));
-      } else {
-        velocity.multiplyScalar(Math.exp(-MOVEMENT.braking * delta));
-        if (velocity.lengthSq() < 0.0004) velocity.set(0, 0, 0);   // settle
-      }
+  // Arms swing opposite the roll. Only the stand-in has arms we can grab.
+  const parts = player.userData.parts;
+  if (parts) {
+    const armSwing = Math.sin(stride) * 0.42 * swing;
+    parts.armR.rotation.x = 0.12 + armSwing;
+    parts.armL.rotation.x = 0.12 - armSwing;
+  }
+}
 
-      const speed = velocity.length();
+/** Move the camera to follow him. Call this AFTER updatePlayer. */
+export function updateCamera(camera, player, controls, dt) {
+  const look = controls.consumeLook();
+  cameraRig.yaw -= look.dx * LOOK_SENSITIVITY;
+  cameraRig.pitch = THREE.MathUtils.clamp(
+    cameraRig.pitch - look.dy * LOOK_SENSITIVITY,
+    -0.2,
+    0.9
+  );
 
-      // --- move, then get pushed back out of anything he walked into -----
-      root.position.x += velocity.x * delta;
-      root.position.z += velocity.z * delta;
-      resolveCollisions(root.position, MOVEMENT.radius, colliders);
+  computeLookTarget(player, _target);
+  computeCameraTarget(player, _offset);
 
-      // --- turn toward where he's going ----------------------------------
-      if (speed > 0.15) {
-        const target = Math.atan2(velocity.x, velocity.z);
-        // Take the shorter way round, so he never spins 350 degrees to turn 10.
-        let difference = target - facing;
-        while (difference > Math.PI) difference -= Math.PI * 2;
-        while (difference < -Math.PI) difference += Math.PI * 2;
-        facing += THREE.MathUtils.clamp(
-          difference,
-          -MOVEMENT.turnRate * delta,
-          MOVEMENT.turnRate * delta
-        );
-      }
-
-      // --- the waddle ------------------------------------------------------
-      stride += speed * delta * WADDLE.stepsPerMetre * Math.PI;
-      // Fade it out as he slows, so a standing penguin doesn't rock.
-      const swing = Math.min(1, speed / MOVEMENT.walkSpeed);
-      const roll = Math.sin(stride) * WADDLE.roll * swing;
-      const bob = Math.abs(Math.sin(stride)) * WADDLE.bob * swing;
-      const wag = Math.sin(stride) * WADDLE.wag * swing;
-
-      // Follow the bumps in the snow instead of skating over them.
-      bodyY = world.groundHeightAt(root.position.x, root.position.z);
-
-      root.position.y = bodyY + bob;
-      root.rotation.set(0, facing + wag, roll);
-
-      // Arms swing opposite the roll. Only the stand-in has arms we can grab.
-      if (parts) {
-        const armSwing = Math.sin(stride) * 0.42 * swing;
-        parts.armR.rotation.x = 0.12 + armSwing;
-        parts.armL.rotation.x = 0.12 - armSwing;
-      }
-
-      // --- camera ----------------------------------------------------------
-      // The camera swings round behind him as he turns. That has to be done
-      // carefully, because the stick is read relative to the camera, so the
-      // camera chasing him can change what the stick means while your thumb is
-      // still holding it:
-      //
-      //   pull down -> he turns to face you -> camera swings behind him ->
-      //   "down" now points the other way -> he turns again -> he spins.
-      //
-      // The fix is to stop chasing in exactly the case that spins. Following
-      // him is stable while he's heading roughly away from the camera - the
-      // stick keeps meaning the same thing - and it only runs away with itself
-      // once he's heading back toward it. So past that angle the camera holds
-      // still and lets him walk at it, which is what you'd expect anyway.
-      let difference = facing - cameraYaw;
-      while (difference > Math.PI) difference -= Math.PI * 2;
-      while (difference < -Math.PI) difference += Math.PI * 2;
-
-      const headingBackAtCamera = Math.abs(difference) > CAMERA.holdAngle;
-      const idle = input.strength < 0.05;
-
-      if (idle) {
-        // Nothing under your thumb, so nothing to confuse: settle in behind
-        // him gently.
-        cameraYaw += difference * (1 - Math.exp(-CAMERA.settleRate * delta));
-      } else if (speed > 0.4 && !headingBackAtCamera) {
-        cameraYaw += difference * (1 - Math.exp(-CAMERA.swingRate * delta));
-      }
-
-      computeCameraTarget(cameraTarget);
-      camera.position.lerp(cameraTarget, 1 - Math.exp(-CAMERA.followRate * delta));
-
-      computeLookTarget(lookTarget);
-      camera.lookAt(lookTarget);
-    },
-  };
+  // Frame-rate independent easing: the same result whether a frame took 5
+  // milliseconds or 50.
+  camera.position.lerp(_offset, 1 - Math.pow(0.001, dt));
+  camera.lookAt(_target);
 }

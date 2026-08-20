@@ -13,8 +13,11 @@ import { createWorld, createSkyline, createBlock, PALETTE } from './world.js';
 import { createSky } from './sky.js';
 import { createTitleScreen, TITLE_FOV } from './titlescreen.js';
 import { loadPenguini } from './character.js';
-import { createInput } from './input.js';
-import { createPlayer } from './player.js';
+import { TouchControls } from './controls.js';
+import {
+  cameraRig, poseWalking, placePlayer, updatePlayer, updateCamera,
+  computeCameraTarget, computeLookTarget,
+} from './player.js';
 
 const boot = document.getElementById('boot');
 const fatal = document.getElementById('fatal');
@@ -80,9 +83,8 @@ let mode = 'title';
 let transition = 0;
 
 let title = null;
-let player = null;
-
-const input = createInput();
+let player = null;      // the character's Object3D, once the game starts
+let controls = null;    // the input device, created when he takes over
 
 // Reused every frame rather than allocated 60 times a second.
 const titlePos = new THREE.Vector3();
@@ -112,13 +114,20 @@ window.addEventListener('orientationchange', () => setTimeout(onResize, 120));
 const timer = new THREE.Timer();
 timer.connect(document);
 
+// Total time the simulation has actually stepped, which is the sum of the
+// clamped deltas rather than wall-clock. On a slow machine those differ a lot,
+// and measuring speed against wall-clock makes a slow frame rate look like a
+// slow character.
+let simTime = 0;
+
 function frame() {
   requestAnimationFrame(frame);
 
   // getDelta = seconds since the last frame. Everything that moves is scaled
   // by it, so the game runs at the same speed on a slow phone and a fast PC.
   timer.update();
-  const delta = Math.min(timer.getDelta(), 0.1);
+  const delta = Math.min(timer.getDelta(), 0.05);   // clamp after tab-switch stalls
+  simTime += delta;
   const elapsed = timer.getElapsed();
 
   if (title) {
@@ -128,8 +137,8 @@ function frame() {
       // Ask the player where the gameplay camera wants to be, then blend from
       // the title shot to there. Arriving exactly on it means the handover
       // happens without a visible jump.
-      player.computeCameraTarget(gameplayPos);
-      player.computeLookTarget(gameplayLook);
+      computeCameraTarget(player, gameplayPos);
+      computeLookTarget(player, gameplayLook);
 
       transition = Math.min(transition + delta * 0.6, 1);
       const t = transition * transition * (3 - 2 * transition);   // ease
@@ -143,7 +152,10 @@ function frame() {
 
       if (transition >= 1) mode = 'game';
     } else {
-      player.update(delta, input.update(), camera);
+      // Order matters. Move him using the camera basis you could see last
+      // frame, then move the camera to follow.
+      updatePlayer(player, camera, controls, delta, world, block.colliders);
+      updateCamera(camera, player, controls, delta);
     }
   } else {
     // Still loading. Show the empty street rather than a black rectangle.
@@ -166,7 +178,13 @@ loadPenguini().then((character) => {
     // start from, then hand him over to the player.
     titlePos.copy(title.camera.pos);
     titleLook.copy(title.camera.look);
-    player = createPlayer(character, world, block.colliders);
+    // He becomes the player: pose him for walking, stand him on the street,
+    // and only now put the joystick on screen.
+    player = character.root;
+    player.userData.parts = character.parts;
+    poseWalking(character.parts);
+    placePlayer(player, world);
+    controls = new TouchControls();
     mode = 'leaving';
   });
 
@@ -177,7 +195,13 @@ loadPenguini().then((character) => {
   });
 
   // Handy for poking at the game from the browser console while developing.
-  window.PENGUINI = { scene, camera, renderer, world, sky, title, character, block,
-                      get player() { return player; }, input,
-                      get mode() { return mode; }, get transition() { return transition; } };
+  window.PENGUINI = { scene, camera, renderer, world, sky, title, character, block, cameraRig,
+                      get player() { return player; },
+                      get controls() { return controls; },
+                      get mode() { return mode; }, get transition() { return transition; },
+                      // In-game seconds. Tests measure speed against this
+                      // rather than wall-clock, so a slow frame rate can't
+                      // masquerade as a slow character.
+                      get elapsed() { return timer.getElapsed(); },
+                      get simTime() { return simTime; } };
 });

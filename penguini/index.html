@@ -23,6 +23,9 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
+        /* Stops pull-to-refresh firing mid-game, which cancels the pointer
+           and leaves the stick stuck on. */
+        overscroll-behavior: none;
         /* Deep navy night - the base colour of the whole game.
            Set here too so there's no white flash before Three.js starts. */
         background: #0a1624;
@@ -37,6 +40,13 @@
 
       canvas {
         display: block;
+        /* Without this the browser claims the gesture as a scroll and simply
+           stops sending us pointermove. */
+        touch-action: none;
+      }
+
+      #input-layer {
+        touch-action: none;
       }
 
       /* Shown while Three.js boots, then removed by main.js. */
