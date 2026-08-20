@@ -93,8 +93,9 @@ story moment in it.
 - [x] Model loading — drop a `.glb` into `public/models/` and it replaces the
       stand-in automatically ([how](public/models/README.md))
 - [ ] Penguini's real 3D model, rigged so he can move
-- [ ] Third-person camera, WASD + mouse on desktop, on-screen stick on mobile
-- [ ] One street block: 8-12 buildings, streetlights, collision
+- [x] Walking: drag anywhere to move, on phone or computer. WASD too.
+- [x] Third-person camera that follows him and swings in behind
+- [x] Block 9 — Igloo Row, the Krill King, streetlights — with collision
 - [ ] Three interaction points, press E to talk
 - [ ] Dialogue system reading branching scenes from `data/scenes.json`
 - [ ] HUD: Cash, Heat, Cred - changed by the choices you make

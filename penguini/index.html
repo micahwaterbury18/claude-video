@@ -39,30 +39,6 @@
         display: block;
       }
 
-      /* Little corner label so you can tell at a glance which build you're on. */
-      #brand {
-        position: fixed;
-        top: max(14px, env(safe-area-inset-top));
-        left: max(14px, env(safe-area-inset-left));
-        z-index: 10;
-        pointer-events: none;
-        letter-spacing: 0.34em;
-        font-size: 13px;
-        font-weight: 700;
-        color: #eaf4ff;
-        text-shadow: 0 0 18px rgba(63, 240, 194, 0.55);
-      }
-
-      #brand span {
-        display: block;
-        margin-top: 6px;
-        font-size: 10px;
-        font-weight: 500;
-        letter-spacing: 0.22em;
-        color: #3ff0c2;
-        opacity: 0.75;
-      }
-
       /* Shown while Three.js boots, then removed by main.js. */
       #boot {
         position: fixed;
@@ -99,7 +75,6 @@
     </style>
   </head>
   <body>
-    <div id="brand">PENGUINI<span>COLD CITY</span></div>
     <div id="boot">LOADING COLD CITY</div>
     <div id="fatal">
       This game needs WebGL, which your browser has turned off or doesn't

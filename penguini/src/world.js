@@ -333,3 +333,131 @@ export function createNeonSign(scene, position) {
   scene.add(group);
   return { group, glow };
 }
+
+/**
+ * Block 9, Igloo Row - the street you actually walk down.
+ *
+ * Two rows of domed housing facing each other across a snowy street, with the
+ * Krill King on the corner. Every building also registers a "collider": a
+ * simple shape the player is not allowed to walk into. The collider is always
+ * a circle or a box, never the real geometry, because checking a circle is
+ * about a thousand times cheaper and you cannot tell the difference when
+ * you bump into it.
+ */
+export function createBlock(scene) {
+  const block = new THREE.Group();
+  block.name = 'block9';
+  const colliders = [];
+
+  const iglooMat = new THREE.MeshStandardMaterial({
+    color: 0xc3d6ec, roughness: 0.95, flatShading: true,
+  });
+  const iglooDark = new THREE.MeshStandardMaterial({
+    color: 0x9db2cd, roughness: 0.95, flatShading: true,
+  });
+  const doorMat = new THREE.MeshBasicMaterial({ color: PALETTE.window });
+
+  // The street runs along z. Buildings sit either side of it.
+  const STREET_HALF_WIDTH = 9;
+
+  for (let i = 0; i < 14; i++) {
+    const side = i % 2 ? 1 : -1;
+    const along = -6 - Math.floor(i / 2) * 13 - (i % 2) * 4;
+    const radius = 3.6 + ((i * 5) % 4) * 0.7;
+    const x = side * (STREET_HALF_WIDTH + radius * 0.75);
+
+    // The dome itself.
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 18, 11, 0, Math.PI * 2, 0, Math.PI * 0.5),
+      i % 3 ? iglooMat : iglooDark
+    );
+    dome.position.set(x, 0, along);
+    dome.castShadow = true;
+    dome.receiveShadow = true;
+    block.add(dome);
+
+    // The entrance tunnel, sticking out toward the street.
+    const tunnel = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.34, radius * 0.34, radius * 0.9, 12, 1, false, 0, Math.PI),
+      iglooMat
+    );
+    tunnel.rotation.z = Math.PI / 2;
+    tunnel.rotation.y = side < 0 ? 0 : Math.PI;
+    tunnel.position.set(x - side * radius * 0.75, 0, along);
+    tunnel.castShadow = true;
+    block.add(tunnel);
+
+    // Warm light spilling out of the doorway.
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(radius * 0.5, radius * 0.55), doorMat);
+    door.position.set(x - side * (radius * 1.18), radius * 0.28, along);
+    door.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2;
+    block.add(door);
+
+    // One collider for the dome, one for its tunnel.
+    colliders.push({ x: dome.position.x, z: along, r: radius * 0.92 });
+    colliders.push({ x: tunnel.position.x, z: along, r: radius * 0.36 });
+  }
+
+  // --- the Krill King, on the corner -------------------------------------
+  // Where chapter 1 happens: Slick kicks him out round the back of this.
+  const krill = new THREE.Group();
+  krill.position.set(-15, 0, 8);
+
+  const shell = new THREE.Mesh(
+    new THREE.BoxGeometry(11, 5.4, 9),
+    new THREE.MeshStandardMaterial({ color: 0x2b3446, roughness: 0.9, flatShading: true })
+  );
+  shell.position.y = 2.7;
+  shell.castShadow = true;
+  shell.receiveShadow = true;
+  krill.add(shell);
+
+  // Its sign, and the pink light it throws onto the snow.
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(7.2, 1.5, 0.3),
+    new THREE.MeshBasicMaterial({ color: PALETTE.pink })
+  );
+  sign.position.set(0, 4.3, 4.6);
+  krill.add(sign);
+
+  const signGlow = new THREE.PointLight(PALETTE.pink, 26, 16, 2);
+  signGlow.position.set(0, 3.8, 6.2);
+  krill.add(signGlow);
+
+  block.add(krill);
+  colliders.push({ x: -15, z: 8, r: 7.0 });
+
+  scene.add(block);
+  return { block, colliders };
+}
+
+/**
+ * Stop the player walking through things.
+ *
+ * Treats the player as a circle. For every building circle it overlaps, push
+ * the player back out along the line between the two centres, just far enough
+ * to be touching instead of overlapping. Doing it for all of them in one pass
+ * means corners between two buildings resolve sensibly instead of juddering.
+ *
+ * @param {THREE.Vector3} position modified in place
+ * @param {number} radius how fat the player is
+ * @param {Array<{x:number,z:number,r:number}>} colliders
+ */
+export function resolveCollisions(position, radius, colliders) {
+  for (const c of colliders) {
+    const dx = position.x - c.x;
+    const dz = position.z - c.z;
+    const minimum = c.r + radius;
+
+    // Compare squared distances - avoids a square root for every building
+    // we're nowhere near, which is most of them.
+    const distanceSq = dx * dx + dz * dz;
+    if (distanceSq >= minimum * minimum || distanceSq === 0) continue;
+
+    const distance = Math.sqrt(distanceSq);
+    const push = (minimum - distance) / distance;
+    position.x += dx * push;
+    position.z += dz * push;
+  }
+  return position;
+}

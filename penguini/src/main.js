@@ -1,18 +1,20 @@
 // main.js - the starting point. Everything begins here.
 //
-// Three jobs:
+// Four jobs:
 //   1. Set up the renderer (the thing that actually draws pixels)
-//   2. Build the world and the title screen
-//   3. Run the game loop, which redraws the screen ~60 times a second
+//   2. Build the world
+//   3. Load Penguini and open the title screen
+//   4. Run the game loop, which redraws the screen ~60 times a second
 //
-// The penguin's movement, the dialogue system and the HUD all get plugged in
-// here as we build them.
+// The dialogue system and the HUD get plugged in here as we build them.
 
 import * as THREE from 'three';
-import { createWorld, createSkyline, PALETTE } from './world.js';
+import { createWorld, createSkyline, createBlock, PALETTE } from './world.js';
 import { createSky } from './sky.js';
 import { createTitleScreen, TITLE_FOV } from './titlescreen.js';
 import { loadPenguini } from './character.js';
+import { createInput } from './input.js';
+import { createPlayer } from './player.js';
 
 const boot = document.getElementById('boot');
 const fatal = document.getElementById('fatal');
@@ -23,11 +25,11 @@ const fatal = document.getElementById('fatal');
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({
-    antialias: true,      // smooth the jagged edges
+    antialias: true,
     powerPreference: 'high-performance',
   });
 } catch (err) {
-  // Some browsers / locked-down phones just can't do 3D. Say so in English
+  // Some browsers and locked-down phones just can't do 3D. Say so in English
   // rather than showing a blank screen.
   console.error(err);
   boot.remove();
@@ -52,45 +54,42 @@ document.body.appendChild(renderer.domElement);
 // ---------------------------------------------------------------------------
 const scene = new THREE.Scene();
 
-const GAME_FOV = 46;
+const GAME_FOV = 52;
 
 const camera = new THREE.PerspectiveCamera(
-  GAME_FOV,                                 // field of view, in degrees
-  window.innerWidth / window.innerHeight,   // aspect ratio
-  0.1,                                      // nearest thing that can be seen
-  2000                                      // furthest - must clear the sky dome
+  GAME_FOV,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  2000              // must clear the sky dome
 );
 
 const world = createWorld(scene);
 createSkyline(scene);
+const block = createBlock(scene);
 
 const sky = createSky();
 scene.add(sky.mesh);
 
 // ---------------------------------------------------------------------------
-// 3. Title screen
+// 3. Game state
 // ---------------------------------------------------------------------------
-// The game opens on Penguini's face. Pressing start swings the camera away
-// from him and out into the street.
+// 'title'   - the opening shot, waiting for a start
+// 'leaving' - the camera flying from his face out to behind his shoulder
+// 'game'    - you're driving
 let mode = 'title';
 let transition = 0;
+
 let title = null;
+let player = null;
 
-// Where the camera ends up once the game starts. This is a placeholder until
-// the third-person camera exists - it just drifts around the block.
-const GAME_CAM = { radius: 30, height: 6.5, speed: 0.045 };
+const input = createInput();
 
-function gameCameraPosition(elapsed, out) {
-  const angle = elapsed * GAME_CAM.speed;
-  return out.set(
-    Math.cos(angle) * GAME_CAM.radius,
-    GAME_CAM.height + Math.sin(elapsed * 0.15) * 1.2,
-    Math.sin(angle) * GAME_CAM.radius
-  );
-}
-
-const scratchPos = new THREE.Vector3();
-const scratchLook = new THREE.Vector3();
+// Reused every frame rather than allocated 60 times a second.
+const titlePos = new THREE.Vector3();
+const titleLook = new THREE.Vector3();
+const gameplayPos = new THREE.Vector3();
+const gameplayLook = new THREE.Vector3();
+const blendedLook = new THREE.Vector3();
 
 // ---------------------------------------------------------------------------
 // 4. Keep the canvas matching the window size
@@ -114,46 +113,42 @@ const timer = new THREE.Timer();
 timer.connect(document);
 
 function frame() {
-  // Ask the browser to call us again on the next screen refresh.
   requestAnimationFrame(frame);
 
   // getDelta = seconds since the last frame. Everything that moves is scaled
-  // by this, so the game runs at the same speed on a slow phone and a fast PC.
+  // by it, so the game runs at the same speed on a slow phone and a fast PC.
   timer.update();
   const delta = Math.min(timer.getDelta(), 0.1);
   const elapsed = timer.getElapsed();
 
-  if (!title) {
-    // Still loading the character. Draw the empty street so there's something
-    // on screen rather than a black rectangle.
-    camera.position.set(0, 6.5, 30);
-    camera.lookAt(0, 5.5, 0);
-    sky.update(elapsed, camera);
-    renderer.render(scene, camera);
-    return;
-  }
+  if (title) {
+    if (mode === 'title') {
+      title.update(elapsed);
+    } else if (mode === 'leaving') {
+      // Ask the player where the gameplay camera wants to be, then blend from
+      // the title shot to there. Arriving exactly on it means the handover
+      // happens without a visible jump.
+      player.computeCameraTarget(gameplayPos);
+      player.computeLookTarget(gameplayLook);
 
-  if (mode === 'title') {
-    title.update(elapsed);
-  } else {
-    // Swing out from his face to the street over about two and a half seconds.
-    if (mode === 'leaving') {
-      transition = Math.min(transition + delta * 0.4, 1);
+      transition = Math.min(transition + delta * 0.6, 1);
+      const t = transition * transition * (3 - 2 * transition);   // ease
+
+      camera.position.lerpVectors(titlePos, gameplayPos, t);
+      blendedLook.lerpVectors(titleLook, gameplayLook, t);
+      camera.lookAt(blendedLook);
+
+      camera.fov = TITLE_FOV + (GAME_FOV - TITLE_FOV) * t;
+      camera.updateProjectionMatrix();
+
       if (transition >= 1) mode = 'game';
+    } else {
+      player.update(delta, input.update(), camera);
     }
-
-    // Ease the movement so it glides instead of snapping.
-    const t = transition * transition * (3 - 2 * transition);
-
-    gameCameraPosition(elapsed, scratchPos);
-    camera.position.lerpVectors(title.camera.pos, scratchPos, t);
-
-    scratchLook.lerpVectors(title.camera.look, new THREE.Vector3(0, 5.5, 0), t);
-    camera.lookAt(scratchLook);
-
-    // Ease the wide title lens back to the normal gameplay one.
-    camera.fov = TITLE_FOV + (GAME_FOV - TITLE_FOV) * t;
-    camera.updateProjectionMatrix();
+  } else {
+    // Still loading. Show the empty street rather than a black rectangle.
+    camera.position.set(0, 6.5, 26);
+    camera.lookAt(0, 3, 0);
   }
 
   sky.update(elapsed, camera);
@@ -167,6 +162,11 @@ frame();
 // ---------------------------------------------------------------------------
 loadPenguini().then((character) => {
   title = createTitleScreen(scene, camera, character, () => {
+    // Remember where the title shot was, so the fly-out has somewhere to
+    // start from, then hand him over to the player.
+    titlePos.copy(title.camera.pos);
+    titleLook.copy(title.camera.look);
+    player = createPlayer(character, world, block.colliders);
     mode = 'leaving';
   });
 
@@ -177,5 +177,7 @@ loadPenguini().then((character) => {
   });
 
   // Handy for poking at the game from the browser console while developing.
-  window.PENGUINI = { scene, camera, renderer, world, sky, title, character };
+  window.PENGUINI = { scene, camera, renderer, world, sky, title, character, block,
+                      get player() { return player; }, input,
+                      get mode() { return mode; }, get transition() { return transition; } };
 });
