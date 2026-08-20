@@ -51,6 +51,25 @@ export const WADDLE = {
 
 const LOOK_SENSITIVITY = 0.005;
 
+export const RECENTRE = {
+  rate: 2.4,          // how fast the camera drifts round behind him
+  idleRate: 1.1,      // ...and when he's standing still
+  // Past this angle the camera stops chasing. See the note in updateCamera:
+  // this is the one number keeping him from spinning on the spot.
+  holdAngle: 2.1,     // radians, about 120 degrees
+  manualPause: 1.0,   // seconds to leave the camera alone after you drag it
+};
+
+let lastManualLook = -Infinity;
+
+/** Shortest way round from a to b, in radians. */
+function shortestAngle(from, to) {
+  let d = to - from;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
 /**
  * Reset his arms out of the title-screen pose into something he can walk in.
  * Only applies to the stand-in; a real model gets posed through its own rig.
@@ -165,14 +184,59 @@ export function updatePlayer(player, camera, controls, dt, world, colliders) {
 }
 
 /** Move the camera to follow him. Call this AFTER updatePlayer. */
-export function updateCamera(camera, player, controls, dt) {
+export function updateCamera(camera, player, controls, dt, elapsed = 0) {
   const look = controls.consumeLook();
-  cameraRig.yaw -= look.dx * LOOK_SENSITIVITY;
-  cameraRig.pitch = THREE.MathUtils.clamp(
-    cameraRig.pitch - look.dy * LOOK_SENSITIVITY,
-    -0.2,
-    0.9
-  );
+
+  // Dragging always wins, and parks the automatic camera for a moment
+  // afterwards so it doesn't immediately undo what you just did.
+  if (look.dx !== 0 || look.dy !== 0) {
+    cameraRig.yaw -= look.dx * LOOK_SENSITIVITY;
+    cameraRig.pitch = THREE.MathUtils.clamp(
+      cameraRig.pitch - look.dy * LOOK_SENSITIVITY,
+      -0.2,
+      0.9
+    );
+    lastManualLook = elapsed;
+  }
+
+  // --- swing round behind him -------------------------------------------
+  // The camera sits at player + (sin yaw, cos yaw) * distance, so to be
+  // BEHIND him the yaw wants to be his facing turned around: facing + PI.
+  //
+  // This is the loop that used to make him spin, so it's worth being precise
+  // about why it now doesn't. The stick is read relative to the camera, so
+  // the camera moving changes what the stick means:
+  //
+  //   holding UP    -> he faces away from the camera -> the camera already
+  //                    wants to be exactly where it is. Stable, no drift.
+  //   holding LEFT
+  //   or RIGHT      -> he turns across, the camera follows, and he curves
+  //                    into a wide circle. That's what every third-person
+  //                    game does and it's what you'd expect.
+  //   holding DOWN  -> he turns back at the camera, the camera swings round
+  //                    behind him, "down" now points the other way, and he
+  //                    turns again. THAT is the spin.
+  //
+  // Only the last one runs away, and it's the only one where he ends up
+  // pointed more than about 120 degrees off the camera. So past that angle
+  // the camera stops chasing and simply lets him walk toward it - which is
+  // what you'd want to see anyway.
+  const facing = player.userData.facing ?? player.rotation.y;
+  const wantedYaw = facing + Math.PI;
+  const difference = shortestAngle(cameraRig.yaw, wantedYaw);
+  const manualRecently = elapsed - lastManualLook < RECENTRE.manualPause;
+
+  if (!manualRecently) {
+    if (player.userData.moving) {
+      if (Math.abs(difference) < RECENTRE.holdAngle) {
+        cameraRig.yaw += difference * (1 - Math.exp(-RECENTRE.rate * dt));
+      }
+    } else {
+      // Standing still: nothing is being held, so nothing can feed back.
+      // Settle in behind him gently, from any angle at all.
+      cameraRig.yaw += difference * (1 - Math.exp(-RECENTRE.idleRate * dt));
+    }
+  }
 
   computeLookTarget(player, _target);
   computeCameraTarget(player, _offset);

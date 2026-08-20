@@ -189,7 +189,7 @@ function frame() {
       if (!dialogue.isOpen) {
         updatePlayer(player, camera, controls, delta, world, colliders);
       }
-      updateCamera(camera, player, controls, delta);
+      updateCamera(camera, player, controls, delta, elapsed);
       interactions.update(player.position, elapsed, world.groundHeightAt);
     }
   } else {
