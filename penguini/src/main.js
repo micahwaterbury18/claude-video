@@ -9,11 +9,17 @@
 // The dialogue system and the HUD get plugged in here as we build them.
 
 import * as THREE from 'three';
-import { createWorld, createSkyline, createBlock, PALETTE } from './world.js';
+import {
+  createWorld, createSkyline, createBlock, createAlley, createSnowfall, PALETTE,
+} from './world.js';
 import { createSky } from './sky.js';
 import { createTitleScreen, TITLE_FOV } from './titlescreen.js';
 import { loadPenguini } from './character.js';
 import { TouchControls } from './controls.js';
+import { createState } from './state.js';
+import { createDialogue } from './dialogue.js';
+import { createHUD } from './hud.js';
+import { createInteractions } from './interactions.js';
 import {
   cameraRig, poseWalking, placePlayer, updatePlayer, updateCamera,
   computeCameraTarget, computeLookTarget,
@@ -69,6 +75,11 @@ const camera = new THREE.PerspectiveCamera(
 const world = createWorld(scene);
 createSkyline(scene);
 const block = createBlock(scene);
+const alley = createAlley(scene);
+const snow = createSnowfall(scene);
+
+// Everything you can walk into, in one list.
+const colliders = [...block.colliders, ...alley.colliders];
 
 const sky = createSky();
 scene.add(sky.mesh);
@@ -85,6 +96,26 @@ let transition = 0;
 let title = null;
 let player = null;      // the character's Object3D, once the game starts
 let controls = null;    // the input device, created when he takes over
+
+// --- the parts that make it a game rather than a walking simulator ---------
+const state = createState();
+state.load();                              // pick up where you left off
+
+const hud = createHUD(state);
+
+const dialogue = createDialogue(state, {
+  // A conversation takes the controls away, so he doesn't wander off mid-scene.
+  onOpen: () => controls?.resetAll(),
+  onClose: () => controls?.resetAll(),
+});
+
+// The three spots on the block you can walk up to. Adding a fourth is one
+// line here plus a scene in data/scenes.json.
+const interactions = createInteractions(scene, state, dialogue, [
+  { scene: 'ch1_frostbite', label: 'Talk to Slick', x: -15, z: 14.5, colour: 0xff4d8d },
+  { scene: 'tuck_outside', label: 'Talk to Tuck', x: -8.5, z: 6.5, colour: 0x3ff0c2 },
+  { scene: 'cindy_door', label: "Cindy's door", x: 8.6, z: -10, colour: 0xffb877 },
+]);
 
 // Reused every frame rather than allocated 60 times a second.
 const titlePos = new THREE.Vector3();
@@ -154,8 +185,12 @@ function frame() {
     } else {
       // Order matters. Move him using the camera basis you could see last
       // frame, then move the camera to follow.
-      updatePlayer(player, camera, controls, delta, world, block.colliders);
+      // A conversation freezes him where he stands.
+      if (!dialogue.isOpen) {
+        updatePlayer(player, camera, controls, delta, world, colliders);
+      }
       updateCamera(camera, player, controls, delta);
+      interactions.update(player.position, elapsed, world.groundHeightAt);
     }
   } else {
     // Still loading. Show the empty street rather than a black rectangle.
@@ -164,6 +199,19 @@ function frame() {
   }
 
   sky.update(elapsed, camera);
+  snow.update(delta, elapsed, camera);
+
+  // The bulb over the alley door swings a little.
+  if (alley.alley.userData.bulb) {
+    alley.alley.userData.bulb.position.x = -15 + Math.sin(elapsed * 0.8) * 0.06;
+  }
+  // Steam rises and fades.
+  for (const puff of alley.alley.userData.steam.children) {
+    const t = (elapsed * 0.4 + puff.userData.offset) % 3.2;
+    puff.position.y = 0.4 + t * 1.1;
+    puff.material.opacity = Math.max(0, 0.07 * (1 - t / 3.2));
+  }
+
   renderer.render(scene, camera);
 }
 
@@ -185,6 +233,7 @@ loadPenguini().then((character) => {
     poseWalking(character.parts);
     placePlayer(player, world);
     controls = new TouchControls();
+    hud.show();
     mode = 'leaving';
   });
 
@@ -203,5 +252,6 @@ loadPenguini().then((character) => {
                       // rather than wall-clock, so a slow frame rate can't
                       // masquerade as a slow character.
                       get elapsed() { return timer.getElapsed(); },
-                      get simTime() { return simTime; } };
+                      get simTime() { return simTime; },
+                      state, dialogue, interactions, alley };
 });

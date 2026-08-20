@@ -1,0 +1,351 @@
+{
+  "_readme": [
+    "All the dialogue in the game lives in this file. You can edit it without touching any code.",
+    "",
+    "A scene has an id, a start node, and a bag of nodes. Each node has:",
+    "  speaker  - whose name shows above the text. Leave it out for narration.",
+    "  text     - what they say.",
+    "  choices  - 2 to 4 options. Each has text, and goto (the id of the next node).",
+    "  effects  - optional. { cash, heat, cred, built, took, flags } applied when chosen.",
+    "  end      - true if the scene finishes here.",
+    "",
+    "built and took are hidden from the player and decide the ending.",
+    "Built goes up when he makes something or looks after someone.",
+    "Took goes up when he takes a shortcut."
+  ],
+
+  "scenes": {
+    "ch1_frostbite": {
+      "title": "Chapter One — Cold Open",
+      "location": "Behind the Krill King",
+      "start": "arrive",
+      "nodes": {
+        "arrive": {
+          "speaker": "Slick",
+          "text": "Don't come round the back, Ini. Front door's for customers and the back door's for us, and you're neither this week.",
+          "choices": [
+            { "text": "\"This week.\" So it's a week.", "goto": "not_a_week" },
+            { "text": "\"It's minus twenty out here.\"", "goto": "minus_twenty" },
+            { "text": "Say nothing. Wait him out.", "goto": "wait_him_out", "effects": { "cred": 1 } }
+          ]
+        },
+
+        "not_a_week": {
+          "speaker": "Slick",
+          "text": "It's not a week.",
+          "choices": [
+            { "text": "\"Then say it properly.\"", "goto": "say_it_properly" },
+            { "text": "\"Slick. Come on.\"", "goto": "come_on" }
+          ]
+        },
+
+        "minus_twenty": {
+          "speaker": "Slick",
+          "text": "It's minus twenty for everyone. Rest of us are inside because we turned up when we said we would.",
+          "choices": [
+            { "text": "\"That's what this is about?\"", "goto": "the_job" },
+            { "text": "\"I had a thing.\"", "goto": "had_a_thing", "effects": { "cred": -1 } }
+          ]
+        },
+
+        "wait_him_out": {
+          "text": "He doesn't fill the silence. He just looks at you, and lets it sit, and you understand that he's already had this conversation in his head and you're only here to hear the end of it.",
+          "choices": [
+            { "text": "\"Just say it.\"", "goto": "say_it_properly" },
+            { "text": "Keep waiting.", "goto": "keep_waiting", "effects": { "cred": 1 } }
+          ]
+        },
+
+        "keep_waiting": {
+          "speaker": "Slick",
+          "text": "You're better at this than you used to be. Fine. You're out. Not this week — out.",
+          "choices": [
+            { "text": "\"Out.\"", "goto": "the_job" },
+            { "text": "\"Okay.\"", "goto": "okay_dignity", "effects": { "cred": 2 } }
+          ]
+        },
+
+        "say_it_properly": {
+          "speaker": "Slick",
+          "text": "You're out of the Frostbite Boys. That properly enough?",
+          "choices": [
+            { "text": "\"Why?\"", "goto": "the_job" },
+            { "text": "\"You can't. It's my crew too.\"", "goto": "my_crew_too" },
+            { "text": "\"Okay.\"", "goto": "okay_dignity", "effects": { "cred": 2 } }
+          ]
+        },
+
+        "come_on": {
+          "speaker": "Slick",
+          "text": "I've come on. I came on for two years. Ask me what the last thing you finished was.",
+          "choices": [
+            { "text": "Say nothing.", "goto": "the_job" },
+            { "text": "\"The tape's nearly done.\"", "goto": "the_tape" }
+          ]
+        },
+
+        "had_a_thing": {
+          "speaker": "Slick",
+          "text": "You always have a thing. That's the whole problem, Ini — you've got a thing every single time, and every one of them is true, and none of them are the reason.",
+          "choices": [
+            { "text": "\"Then what's the reason?\"", "goto": "the_reason" },
+            { "text": "\"That's not fair.\"", "goto": "not_fair" }
+          ]
+        },
+
+        "my_crew_too": {
+          "speaker": "Slick",
+          "text": "It was. Then Tuesday happened, and it stopped being.",
+          "choices": [
+            { "text": "\"I was forty minutes late.\"", "goto": "the_job" },
+            { "text": "\"Everyone's late.\"", "goto": "the_job", "effects": { "cred": -1 } }
+          ]
+        },
+
+        "the_job": {
+          "speaker": "Slick",
+          "text": "You weren't late. You didn't come. Kez stood on the corner of Glacier and Third for an hour and a half in the open, on his own, holding something he shouldn't have been holding, waiting for a lookout who was at home.",
+          "choices": [
+            { "text": "\"Is he alright?\"", "goto": "is_he_alright", "effects": { "built": 1, "cred": 1 } },
+            { "text": "\"Nobody got picked up.\"", "goto": "nobody_got_picked_up", "effects": { "cred": -2 } },
+            { "text": "\"I know.\"", "goto": "i_know" }
+          ]
+        },
+
+        "is_he_alright": {
+          "speaker": "Slick",
+          "text": "…He's fine. He's shaken. He's nineteen.\n\nThat's the first thing you've asked me tonight that wasn't about you.",
+          "choices": [
+            { "text": "\"Tell him I'm sorry.\"", "goto": "the_reason", "effects": { "built": 1 } },
+            { "text": "\"Then let me make it right.\"", "goto": "make_it_right" }
+          ]
+        },
+
+        "nobody_got_picked_up": {
+          "speaker": "Slick",
+          "text": "No. Nobody got picked up. That's luck, and you're standing there spending it like you earned it.",
+          "choices": [
+            { "text": "\"That's not what I meant.\"", "goto": "the_reason" },
+            { "text": "\"So it worked out.\"", "goto": "so_it_worked_out", "effects": { "cred": -2, "took": 1 } }
+          ]
+        },
+
+        "so_it_worked_out": {
+          "speaker": "Slick",
+          "text": "Yeah. It worked out.\n\nGo home, Ini.",
+          "choices": [
+            { "text": "\"Slick—\"", "goto": "end_begged" },
+            { "text": "Go.", "goto": "end_walked", "effects": { "cred": 1 } }
+          ]
+        },
+
+        "i_know": {
+          "speaker": "Slick",
+          "text": "I know you know. That's what makes it worse. You knew on Tuesday and you still didn't come.",
+          "choices": [
+            { "text": "\"I couldn't face it.\"", "goto": "the_reason", "effects": { "built": 1 } },
+            { "text": "\"Let me make it right.\"", "goto": "make_it_right" }
+          ]
+        },
+
+        "not_fair": {
+          "speaker": "Slick",
+          "text": "It's completely fair. You just don't like it. Those are different things and you've spent your whole life mixing them up.",
+          "choices": [
+            { "text": "\"Then what's the reason?\"", "goto": "the_reason" },
+            { "text": "\"Say what you actually mean.\"", "goto": "the_reason" }
+          ]
+        },
+
+        "the_reason": {
+          "speaker": "Slick",
+          "text": "Everyone on this block has a thing they're going to do. Bruno's opening a place. Marla's going back to school. You're going to be a rapper.\n\nDifference is, the rest of them turn up to work while they wait.",
+          "choices": [
+            { "text": "\"You've heard the tape.\"", "goto": "the_tape" },
+            { "text": "\"So I'm a joke to you.\"", "goto": "a_joke" },
+            { "text": "\"You're right.\"", "goto": "youre_right", "effects": { "built": 2, "cred": 2 } }
+          ]
+        },
+
+        "the_tape": {
+          "speaker": "Slick",
+          "text": "I've heard four minutes of it. Same four minutes for eight months.\n\nAnd Ini — those four minutes are good. That's not me being kind. They're actually good. Which is why I stopped being able to watch this.",
+          "choices": [
+            { "text": "\"Then help me finish it.\"", "goto": "help_me_finish", "effects": { "built": 1 } },
+            { "text": "\"You've never said that before.\"", "goto": "never_said_that", "effects": { "built": 1 } },
+            { "text": "\"Doesn't pay rent.\"", "goto": "doesnt_pay_rent", "effects": { "took": 1 } }
+          ]
+        },
+
+        "never_said_that": {
+          "speaker": "Slick",
+          "text": "No. I didn't. Because you'd have taken it as permission to keep not finishing it.\n\nI'm saying it now because you're not mine to manage any more.",
+          "choices": [
+            { "text": "\"That's a rough way to hear it.\"", "goto": "end_walked", "effects": { "cred": 1, "built": 1 } },
+            { "text": "\"Then let me back in.\"", "goto": "end_begged" }
+          ]
+        },
+
+        "help_me_finish": {
+          "speaker": "Slick",
+          "text": "I'm not your manager, I'm a guy who moves boxes off a pier. Go see Fathom under the boardwalk. He'll keep the booth unlocked for you, which is more than I'd do right now.",
+          "choices": [
+            { "text": "\"Fathom's still down there?\"", "goto": "end_walked", "effects": { "built": 2, "flags": { "knowsFathom": true } } },
+            { "text": "\"I don't need a lecture, I need work.\"", "goto": "make_it_right" }
+          ]
+        },
+
+        "doesnt_pay_rent": {
+          "speaker": "Slick",
+          "text": "No. It doesn't. Neither does standing here.\n\nKodi's people are on the boardwalk most nights, if that's the road you want. Don't tell them I said so.",
+          "choices": [
+            { "text": "\"Maybe it is.\"", "goto": "end_walked", "effects": { "took": 2, "flags": { "knowsKodi": true } } },
+            { "text": "\"You're really sending me to Kodi?\"", "goto": "sending_me_to_kodi" }
+          ]
+        },
+
+        "sending_me_to_kodi": {
+          "speaker": "Slick",
+          "text": "I'm not sending you anywhere. I'm telling you where the door is, because you're going to find it anyway and I'd rather you found it with your eyes open.",
+          "choices": [
+            { "text": "Nod. Go.", "goto": "end_walked", "effects": { "cred": 1, "flags": { "knowsKodi": true } } }
+          ]
+        },
+
+        "a_joke": {
+          "speaker": "Slick",
+          "text": "No. A joke would be easier. I'd have laughed at a joke two years ago and we'd still be talking.",
+          "choices": [
+            { "text": "\"So what am I?\"", "goto": "what_am_i" },
+            { "text": "\"Then don't do this.\"", "goto": "end_begged" }
+          ]
+        },
+
+        "what_am_i": {
+          "speaker": "Slick",
+          "text": "You're the most talented person I know and I can't have you standing next to me when it goes wrong. Both of those are true. I've stopped trying to make them fit.",
+          "choices": [
+            { "text": "\"…Okay.\"", "goto": "okay_dignity", "effects": { "cred": 2, "built": 1 } },
+            { "text": "\"You'll regret this.\"", "goto": "end_threatened", "effects": { "heat": 4, "cred": -2, "took": 1 } }
+          ]
+        },
+
+        "youre_right": {
+          "speaker": "Slick",
+          "text": "…\n\nDon't do that. Don't agree with me, it makes this harder.\n\nYou're still out.",
+          "choices": [
+            { "text": "\"I know.\"", "goto": "okay_dignity", "effects": { "cred": 2 } },
+            { "text": "\"Worth a try.\"", "goto": "okay_dignity", "effects": { "cred": 1 } }
+          ]
+        },
+
+        "make_it_right": {
+          "speaker": "Slick",
+          "text": "There's nothing to make right. That's what I keep telling you. Nobody's owed anything, there's no job you can do to fix Tuesday. It's just over.",
+          "choices": [
+            { "text": "\"Give me one more.\"", "goto": "end_begged" },
+            { "text": "\"Then I'll find my own work.\"", "goto": "end_walked", "effects": { "cred": 1, "took": 1 } }
+          ]
+        },
+
+        "okay_dignity": {
+          "speaker": "Slick",
+          "text": "He waits, like he expected more. When it doesn't come, something in his face goes worse, not better.\n\n\"Take care of yourself, Ini. I mean that.\"",
+          "choices": [
+            { "text": "\"You too.\"", "goto": "end_walked", "effects": { "cred": 2, "built": 1 } }
+          ]
+        },
+
+        "end_walked": {
+          "text": "The back door shuts. The fryer noise goes with it, and then it's just the hum of the sign and the cold coming up through your shoes.\n\nRent is due Friday. You have no crew, no girlfriend, and four good minutes of a song nobody has heard.",
+          "end": true,
+          "effects": { "flags": { "kickedOut": true, "ch1Complete": true }, "cred": 1 }
+        },
+
+        "end_begged": {
+          "speaker": "Slick",
+          "text": "He lets you get about six words in. Then he puts a flipper on the door and stops, without turning round.\n\n\"Don't. Please. Let one of us walk away from this with something.\"",
+          "choices": [
+            { "text": "Stop talking.", "goto": "end_walked_quiet", "effects": { "cred": -1 } }
+          ]
+        },
+
+        "end_walked_quiet": {
+          "text": "The back door shuts. You stand in the alley a while longer than you need to.\n\nRent is due Friday. You have no crew, no girlfriend, and four good minutes of a song nobody has heard.",
+          "end": true,
+          "effects": { "flags": { "kickedOut": true, "ch1Complete": true, "beggedSlick": true }, "cred": -2 }
+        },
+
+        "end_threatened": {
+          "speaker": "Slick",
+          "text": "That's the first thing you've said tonight that sounded like somebody else. Kodi, probably. You've been on the boardwalk.\n\n\"Go home before you say the second one.\"",
+          "choices": [
+            { "text": "Go.", "goto": "end_walked_angry" }
+          ]
+        },
+
+        "end_walked_angry": {
+          "text": "The back door shuts harder than it needs to. Somewhere down the block a Seal cruiser rolls past the mouth of the alley, slow, the way they do when they've got nowhere to be.\n\nRent is due Friday.",
+          "end": true,
+          "effects": { "flags": { "kickedOut": true, "ch1Complete": true, "threatenedSlick": true }, "heat": 6, "cred": -1 }
+        }
+      }
+    },
+
+    "cindy_door": {
+      "title": "Block 9, one floor up",
+      "location": "Cindy's door",
+      "start": "locked",
+      "nodes": {
+        "locked": {
+          "text": "Her light is on. You can hear a textbook page turn, which means she's revising, which means she has work in six hours.\n\nYou don't knock. Not tonight, not like this.",
+          "end": true,
+          "effects": { "flags": { "sawCindysLight": true } }
+        }
+      }
+    },
+
+    "tuck_outside": {
+      "title": "Outside the Krill King",
+      "location": "The front step",
+      "start": "hello",
+      "nodes": {
+        "hello": {
+          "speaker": "Tuck",
+          "text": "Ini! Ini. Hey. Did they do you as well?\n\nHe is sitting on an upturned crate eating chips out of the bag with a flipper, entirely unbothered, wearing one glove.",
+          "choices": [
+            { "text": "\"You're out too?\"", "goto": "out_too" },
+            { "text": "\"Where's your other glove?\"", "goto": "glove" }
+          ]
+        },
+        "glove": {
+          "speaker": "Tuck",
+          "text": "Long story. Good story. Bad ending for the glove.",
+          "choices": [
+            { "text": "\"Tuck. Are you out too?\"", "goto": "out_too" }
+          ]
+        },
+        "out_too": {
+          "speaker": "Tuck",
+          "text": "Yeah! Well — I walked. Slick said you were done and I said then I'm done and he said fine and I said fine, and then I was outside.\n\nHe holds out the bag.\n\n\"I've been thinking about it a lot since and I do think I moved too fast.\"",
+          "choices": [
+            { "text": "Take a chip.", "goto": "chip", "effects": { "built": 1, "cred": 1 } },
+            { "text": "\"You shouldn't have done that.\"", "goto": "shouldnt", "effects": { "built": 1 } }
+          ]
+        },
+        "chip": {
+          "speaker": "Tuck",
+          "text": "So what do we do now?\n\nHe says WE like it was never a question, and it's the warmest thing that's happened to you all week.",
+          "end": true,
+          "effects": { "flags": { "tuckWithYou": true } }
+        },
+        "shouldnt": {
+          "speaker": "Tuck",
+          "text": "Probably not! Bit late though.\n\nSo what do we do now?",
+          "end": true,
+          "effects": { "flags": { "tuckWithYou": true } }
+        }
+      }
+    }
+  }
+}

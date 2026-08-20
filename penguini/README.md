@@ -96,10 +96,12 @@ story moment in it.
 - [x] Walking: drag anywhere to move, on phone or computer. WASD too.
 - [x] Third-person camera that follows him and swings in behind
 - [x] Block 9 — Igloo Row, the Krill King, streetlights — with collision
-- [ ] Three interaction points, press E to talk
-- [ ] Dialogue system reading branching scenes from `data/scenes.json`
-- [ ] HUD: Cash, Heat, Cred - changed by the choices you make
-- [ ] The scene: Penguini gets kicked out of the Frostbite Boys
+- [x] Three interaction points, press E (or tap the prompt) to talk
+- [x] Dialogue system reading branching scenes from `data/scenes.json`
+- [x] HUD: Cash, Heat, Cred - changed by the choices you make
+- [x] Chapter 1: Penguini gets kicked out of the Frostbite Boys
+- [x] Save/load - your game keeps itself in the browser
+- [ ] Penguini's real 3D model, rigged so he can move
 
 Phases 2-4 (the rest of the city, missions, the full story) come after Phase 1
 is playable end to end.

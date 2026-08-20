@@ -387,11 +387,30 @@ export function createBlock(scene) {
     tunnel.castShadow = true;
     block.add(tunnel);
 
-    // Warm light spilling out of the doorway.
-    const door = new THREE.Mesh(new THREE.PlaneGeometry(radius * 0.5, radius * 0.55), doorMat);
-    door.position.set(x - side * (radius * 1.18), radius * 0.28, along);
-    door.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2;
-    block.add(door);
+    // Warm light in the doorway. Set INSIDE the mouth of the tunnel with a
+    // dark surround, otherwise it reads as a glowing sheet stuck to the front
+    // of the igloo rather than a lit room behind a door.
+    const doorway = new THREE.Group();
+    doorway.position.set(x - side * (radius * 1.12), 0, along);
+    doorway.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2;
+
+    const surround = new THREE.Mesh(
+      new THREE.PlaneGeometry(radius * 0.46, radius * 0.5),
+      new THREE.MeshBasicMaterial({ color: 0x0d1722 })
+    );
+    surround.position.y = radius * 0.25;
+    doorway.add(surround);
+
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(radius * 0.30, radius * 0.38), doorMat);
+    door.position.set(0, radius * 0.22, 0.04);
+    doorway.add(door);
+
+    // A small pool of warm light on the snow outside it.
+    const spill = new THREE.PointLight(0xffb877, 5.5, 6, 2);
+    spill.position.set(0, 1.1, 0.9);
+    doorway.add(spill);
+
+    block.add(doorway);
 
     // One collider for the dome, one for its tunnel.
     colliders.push({ x: dome.position.x, z: along, r: radius * 0.92 });
@@ -460,4 +479,164 @@ export function resolveCollisions(position, radius, colliders) {
     position.z += dz * push;
   }
   return position;
+}
+
+/**
+ * The alley behind the Krill King.
+ *
+ * This is where chapter one happens: Slick kicks Penguini out of the Frostbite
+ * Boys by the back door, with the fryer noise coming through the wall. It's
+ * built as a dead end on purpose - somewhere you go to have a conversation you
+ * can't have on the street.
+ */
+export function createAlley(scene) {
+  const alley = new THREE.Group();
+  alley.name = 'alley';
+  const colliders = [];
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x232c3d, roughness: 0.95, flatShading: true });
+  const binMat = new THREE.MeshStandardMaterial({ color: 0x2f3a4d, roughness: 0.85 });
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0x4a3f33, roughness: 0.95, flatShading: true });
+
+  // Back wall, closing the alley off.
+  const back = new THREE.Mesh(new THREE.BoxGeometry(16, 6.5, 0.7), wallMat);
+  back.position.set(-15, 3.25, 19);
+  back.castShadow = true;
+  back.receiveShadow = true;
+  alley.add(back);
+  colliders.push({ x: -15, z: 19, r: 7.4 });
+
+  // Side wall, so it reads as a corridor rather than open ground.
+  const side = new THREE.Mesh(new THREE.BoxGeometry(0.7, 6.5, 12), wallMat);
+  side.position.set(-22.5, 3.25, 14);
+  side.castShadow = true;
+  alley.add(side);
+  colliders.push({ x: -22.5, z: 14, r: 5.6 });
+
+  // The back door of the Krill King, and the light spilling out of it.
+  const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.9, 3.1, 0.24), new THREE.MeshStandardMaterial({ color: 0x171d28, roughness: 0.9 }));
+  doorFrame.position.set(-15, 1.55, 12.6);
+  alley.add(doorFrame);
+
+  const doorGlow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.45, 2.6),
+    new THREE.MeshBasicMaterial({ color: 0xffcf94 })
+  );
+  doorGlow.position.set(-15, 1.5, 12.74);
+  alley.add(doorGlow);
+
+  const doorLight = new THREE.PointLight(0xffb877, 22, 12, 2);
+  doorLight.position.set(-15, 2.1, 13.6);
+  alley.add(doorLight);
+
+  // A bare bulb over the door, swinging very slightly.
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d0 }));
+  bulb.position.set(-15, 3.6, 13.2);
+  alley.add(bulb);
+  alley.userData.bulb = bulb;
+
+  // Bins and crates. Clutter is what makes somewhere feel used.
+  const clutter = [
+    { type: 'bin', x: -18.6, z: 15.2, r: 0.85, h: 1.9 },
+    { type: 'bin', x: -17.4, z: 16.6, r: 0.75, h: 1.6 },
+    { type: 'bin', x: -11.8, z: 16.9, r: 0.85, h: 1.9 },
+    { type: 'crate', x: -20.4, z: 12.4, r: 0.8, h: 0.9 },
+    { type: 'crate', x: -20.2, z: 13.6, r: 0.7, h: 0.8 },
+    { type: 'crate', x: -10.6, z: 14.0, r: 0.75, h: 0.85 },
+  ];
+
+  for (const item of clutter) {
+    let mesh;
+    if (item.type === 'bin') {
+      mesh = new THREE.Mesh(new THREE.CylinderGeometry(item.r, item.r * 0.88, item.h, 10), binMat);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(item.r * 1.08, item.r * 1.08, 0.14, 10), binMat);
+      lid.position.y = item.h / 2 + 0.07;
+      mesh.add(lid);
+    } else {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(item.r * 1.8, item.h, item.r * 1.8), crateMat);
+      mesh.rotation.y = (item.x * 7) % 1;
+    }
+    mesh.position.set(item.x, item.h / 2, item.z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    alley.add(mesh);
+    colliders.push({ x: item.x, z: item.z, r: item.r * 0.95 });
+  }
+
+  // Steam off a vent, because every alley has one.
+  const steam = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const puff = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5 + i * 0.16, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xdfeaf7, transparent: true, opacity: 0.05, depthWrite: false })
+    );
+    puff.position.set(-19.6, 0.5 + i * 0.75, 17.8);
+    puff.userData.offset = i * 0.9;
+    steam.add(puff);
+  }
+  alley.add(steam);
+  alley.userData.steam = steam;
+
+  scene.add(alley);
+  return { alley, colliders };
+}
+
+/**
+ * Snow falling.
+ *
+ * One big cloud of points that follows the camera around, so it always looks
+ * like it's snowing on you wherever you are, without simulating snow over the
+ * whole city.
+ */
+export function createSnowfall(scene, count = 1400) {
+  const SPREAD = 60;
+  const HEIGHT = 26;
+
+  const positions = new Float32Array(count * 3);
+  const speeds = new Float32Array(count);
+  const drifts = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * SPREAD;
+    positions[i * 3 + 1] = Math.random() * HEIGHT;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
+    speeds[i] = 0.8 + Math.random() * 1.6;
+    drifts[i] = Math.random() * Math.PI * 2;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const flakes = new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xeaf4ff,
+    size: 0.11,
+    transparent: true,
+    opacity: 0.72,
+    depthWrite: false,
+    sizeAttenuation: true,
+  }));
+  flakes.frustumCulled = false;
+  flakes.name = 'snowfall';
+  scene.add(flakes);
+
+  return {
+    flakes,
+    update(delta, elapsed, camera) {
+      const p = geometry.attributes.position.array;
+      for (let i = 0; i < count; i++) {
+        const y = i * 3 + 1;
+        p[y] -= speeds[i] * delta;
+        // Drift sideways as it falls, so it isn't rain.
+        p[i * 3] += Math.sin(elapsed * 0.6 + drifts[i]) * delta * 0.35;
+        if (p[y] < 0) {
+          p[y] = HEIGHT;
+          p[i * 3] = (Math.random() - 0.5) * SPREAD;
+          p[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
+        }
+      }
+      geometry.attributes.position.needsUpdate = true;
+      // Keep the whole cloud centred on the camera.
+      flakes.position.set(camera.position.x, 0, camera.position.z);
+    },
+  };
 }

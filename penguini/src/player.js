@@ -27,9 +27,12 @@ const _target = new THREE.Vector3();
 
 export const cameraRig = {
   yaw: 0,            // radians - ONLY drag input writes this
-  pitch: 0.25,
-  distance: 7,
-  height: 1.6,
+  // Slightly below level. The offset formula adds half a distance of height on
+  // top of this, so anything much above zero puts the camera on the roof and
+  // you end up looking at the top of his hat.
+  pitch: -0.06,
+  distance: 6.4,
+  height: 1.25,
 };
 
 export const MOVEMENT = {
