@@ -170,7 +170,10 @@ export function createTitleScreen(scene, camera, character, onStart) {
   const lamps = createStreetlights(scene, [
     // Close, behind and to his left: the reason there's a warm edge down one
     // side of him.
-    { x: -3.15, z: -2.30, face: 1, intensity: 40, shadows: true },
+    // No shadows on this one. A point light that casts shadows renders the
+    // whole scene SIX times, once per face of a cube around it - it was the
+    // single most expensive thing in the game.
+    { x: -3.15, z: -2.30, face: 1, intensity: 40 },
     // In front and to his right, out of shot. Without a lamp on this side
     // nothing lights his face and he reads as a dark shape.
     { x: 4.10, z: 2.60, face: -1, intensity: 34 },

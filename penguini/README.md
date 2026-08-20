@@ -93,6 +93,17 @@ story moment in it.
 - [x] Model loading — drop a `.glb` into `public/models/` and it replaces the
       stand-in automatically ([how](public/models/README.md))
 - [ ] Penguini's real 3D model, rigged so he can move
+
+**Phase 2 - the city.**
+
+- [x] Four districts: Igloo Row, the Boardwalk, the Docks, the Meridian
+- [x] Roads linking them, so it's one city rather than four islands
+- [x] A map screen (M, or the MAP button) drawn from the same district data
+      the game uses, so it can never disagree with the real city
+- [x] District titles when you cross into somewhere new
+- [x] NPC penguins and seal cops walking their own routes
+- [ ] Day/night cycle
+- [ ] Enterable interiors
 - [x] Walking: drag anywhere to move, on phone or computer. WASD too.
 - [x] Third-person camera that follows him and swings in behind
 - [x] Block 9 — Igloo Row, the Krill King, streetlights — with collision

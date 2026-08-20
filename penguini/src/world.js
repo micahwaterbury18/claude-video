@@ -99,14 +99,14 @@ function createLights(scene) {
   const moon = new THREE.DirectionalLight(0xc9dfff, 0.85);
   moon.position.set(-70, 90, 40);
   moon.castShadow = true;
-  moon.shadow.mapSize.set(2048, 2048);
+  moon.shadow.mapSize.set(1536, 1536);
   moon.shadow.camera.near = 1;
   moon.shadow.camera.far = 320;
   // How wide an area gets crisp shadows. Bigger = covers more, looks blurrier.
-  moon.shadow.camera.left = -90;
-  moon.shadow.camera.right = 90;
-  moon.shadow.camera.top = 90;
-  moon.shadow.camera.bottom = -90;
+  moon.shadow.camera.left = -70;
+  moon.shadow.camera.right = 70;
+  moon.shadow.camera.top = 70;
+  moon.shadow.camera.bottom = -70;
   moon.shadow.bias = -0.0008;
   scene.add(moon);
 
@@ -420,10 +420,10 @@ export function createBlock(scene) {
     door.position.set(0, radius * 0.22, 0.04);
     doorway.add(door);
 
-    // A small pool of warm light on the snow outside it.
-    const spill = new THREE.PointLight(0xffb877, 5.5, 6, 2);
-    spill.position.set(0, 1.1, 0.9);
-    doorway.add(spill);
+    // No point light here on purpose. There are fourteen of these, and every
+    // light in the scene costs shader work on every surface that can see it -
+    // fourteen of them cost more than they're worth. The glowing panel and the
+    // streetlamps already sell it as a lit room.
 
     block.add(doorway);
 

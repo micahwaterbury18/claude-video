@@ -21,6 +21,11 @@ import { createDialogue } from './dialogue.js';
 import { createHUD } from './hud.js';
 import { createInteractions } from './interactions.js';
 import {
+  createRoads, createBoardwalk, createDocks, createMeridianPlaza,
+} from './districts.js';
+import { createNPCs, ROUTES } from './npcs.js';
+import { createMap } from './map.js';
+import {
   cameraRig, poseWalking, placePlayer, updatePlayer, updateCamera,
   computeCameraTarget, computeLookTarget,
 } from './player.js';
@@ -78,8 +83,24 @@ const block = createBlock(scene);
 const alley = createAlley(scene);
 const snow = createSnowfall(scene);
 
+// The rest of Cold City.
+createRoads(scene);
+const boardwalk = createBoardwalk(scene);
+const docks = createDocks(scene);
+const meridian = createMeridianPlaza(scene);
+
 // Everything you can walk into, in one list.
-const colliders = [...block.colliders, ...alley.colliders];
+const colliders = [
+  ...block.colliders,
+  ...alley.colliders,
+  ...boardwalk.colliders,
+  ...docks.colliders,
+  ...meridian.colliders,
+];
+
+// Traffic. Not characters - you can't talk to them - but a street with people
+// crossing it reads as a place, and the same street empty reads as a diagram.
+const npcs = createNPCs(scene, world, ROUTES);
 
 const sky = createSky();
 scene.add(sky.mesh);
@@ -111,6 +132,8 @@ const dialogue = createDialogue(state, {
 
 // The three spots on the block you can walk up to. Adding a fourth is one
 // line here plus a scene in data/scenes.json.
+const map = createMap(state, { get points() { return interactions.points; } });
+
 const interactions = createInteractions(scene, state, dialogue, [
   { scene: 'ch1_frostbite', label: 'Talk to Slick', x: -15, z: 14.5, colour: 0xff4d8d },
   { scene: 'tuck_outside', label: 'Talk to Tuck', x: -8.5, z: 6.5, colour: 0x3ff0c2 },
@@ -185,12 +208,13 @@ function frame() {
     } else {
       // Order matters. Move him using the camera basis you could see last
       // frame, then move the camera to follow.
-      // A conversation freezes him where he stands.
-      if (!dialogue.isOpen) {
+      // A conversation or the map screen freezes him where he stands.
+      if (!dialogue.isOpen && !map.isOpen) {
         updatePlayer(player, camera, controls, delta, world, colliders);
       }
       updateCamera(camera, player, controls, delta, elapsed);
       interactions.update(player.position, elapsed, world.groundHeightAt);
+      map.update(player);
     }
   } else {
     // Still loading. Show the empty street rather than a black rectangle.
@@ -200,6 +224,12 @@ function frame() {
 
   sky.update(elapsed, camera);
   snow.update(delta, elapsed, camera);
+  npcs.update(delta, elapsed);
+
+  // The crane's warning light, blinking over the docks.
+  if (docks.group.userData.craneBeacon) {
+    docks.group.userData.craneBeacon.visible = Math.sin(elapsed * 1.6) > 0;
+  }
 
   // The bulb over the alley door swings a little.
   if (alley.alley.userData.bulb) {
@@ -235,6 +265,8 @@ loadPenguini().then((character) => {
     controls = new TouchControls();
     if (title.sign?.collider) colliders.push(title.sign.collider);
     hud.show();
+    map.showButton();
+    map.bind(() => player);
     mode = 'leaving';
   });
 
@@ -254,5 +286,6 @@ loadPenguini().then((character) => {
                       // masquerade as a slow character.
                       get elapsed() { return timer.getElapsed(); },
                       get simTime() { return simTime; },
-                      state, dialogue, interactions, alley };
+                      state, dialogue, interactions, alley, map, npcs,
+                      districts: { boardwalk, docks, meridian } };
 });
