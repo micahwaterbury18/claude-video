@@ -326,12 +326,27 @@ export function createNeonSign(scene, position) {
   );
   group.add(tube);
 
+  // A bracket and a post holding it up. Without these it's a glowing bar
+  // hovering in the middle of the road with nothing under it.
+  const dark = new THREE.MeshStandardMaterial({ color: 0x232a36, roughness: 0.9 });
+
+  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.09, 0.09), dark);
+  bracket.position.set(-1.6, 0.16, 0);
+  group.add(bracket);
+
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 5.6, 8), dark);
+  post.position.set(-2.0, -2.55, 0);
+  post.castShadow = true;
+  group.add(post);
+
   const glow = new THREE.PointLight(PALETTE.pink, 14, 9, 2);
   glow.position.set(0, -0.2, 0.4);
   group.add(glow);
 
   scene.add(group);
-  return { group, glow };
+  // Where the post meets the ground, so the caller can stop you walking
+  // through it.
+  return { group, glow, collider: { x: position.x - 2.0, z: position.z, r: 0.35 } };
 }
 
 /**

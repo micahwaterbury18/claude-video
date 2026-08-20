@@ -181,7 +181,9 @@ export function createTitleScreen(scene, camera, character, onStart) {
 
   // The Krill King's sign, off to his right. Hot pink, so he picks up the
   // colour of the criminal world along that edge.
-  const sign = createNeonSign(scene, new THREE.Vector3(2.85, 2.55, -1.35));
+  // Off at the kerb, not in the middle of the road - he has to walk past this
+// spot the whole game.
+  const sign = createNeonSign(scene, new THREE.Vector3(6.9, 3.0, -1.1));
 
   camera.fov = TITLE_FOV;
   camera.updateProjectionMatrix();

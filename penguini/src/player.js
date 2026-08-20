@@ -25,14 +25,23 @@ const _dir = new THREE.Vector3();
 const _offset = new THREE.Vector3();
 const _target = new THREE.Vector3();
 
+// The point the camera watches. Smoothed, so it lags his bobbing slightly.
+const followPoint = new THREE.Vector3();
+followPoint.initialised = false;
+const CAMERA_FOLLOW_RATE = 9;
+
 export const cameraRig = {
-  yaw: 0,            // radians - ONLY drag input writes this
-  // Slightly below level. The offset formula adds half a distance of height on
-  // top of this, so anything much above zero puts the camera on the roof and
-  // you end up looking at the top of his hat.
-  pitch: -0.06,
-  distance: 6.4,
-  height: 1.25,
+  yaw: 0,          // which way round him the camera sits
+  pitch: 0.22,     // how high above him, in radians. 0 = level with his head.
+  distance: 6.4,   // how far back
+  height: 1.25,    // how far up his body the camera aims
+};
+
+export const LOOK = {
+  turnRate: 1.7,   // radians per second at a full push (about 97 deg/sec)
+  pitchRate: 1.1,
+  minPitch: 0.02,  // never drop to ground level - you'd see through the snow
+  maxPitch: 1.05,  // never go directly overhead
 };
 
 export const MOVEMENT = {
@@ -96,18 +105,31 @@ export function placePlayer(player, world) {
   player.position.set(0, world.groundHeightAt(0, 6), 6);
   player.rotation.set(0, Math.PI, 0);   // he faces -z, down the block
   cameraRig.yaw = 0;                    // so the camera sits on the +z side
+  cameraRig.pitch = 0.22;
+  followPoint.initialised = false;      // don't glide in from the last game
   player.userData.stride = 0;
   player.userData.moving = false;
 }
 
+/**
+ * Where the camera sits, relative to the point it's aiming at.
+ *
+ * A proper orbit: always exactly `distance` away, on a sphere around him. The
+ * old version added half a distance of height on top, which meant "pitch"
+ * didn't mean anything you could reason about and the camera sat on the roof.
+ */
+function orbitOffset(out) {
+  const horizontal = Math.cos(cameraRig.pitch) * cameraRig.distance;
+  return out.set(
+    Math.sin(cameraRig.yaw) * horizontal,
+    Math.sin(cameraRig.pitch) * cameraRig.distance,
+    Math.cos(cameraRig.yaw) * horizontal
+  );
+}
+
 /** Where the camera wants to sit, without moving it. Used by the title fly-in. */
 export function computeCameraTarget(player, out) {
-  const cp = Math.cos(cameraRig.pitch);
-  _offset.set(
-    Math.sin(cameraRig.yaw) * cp,
-    Math.sin(cameraRig.pitch) + 0.5,
-    Math.cos(cameraRig.yaw) * cp
-  ).multiplyScalar(cameraRig.distance);
+  orbitOffset(_offset);
   return out.copy(player.position).setY(player.position.y + cameraRig.height).add(_offset);
 }
 
@@ -185,42 +207,40 @@ export function updatePlayer(player, camera, controls, dt, world, colliders) {
 
 /** Move the camera to follow him. Call this AFTER updatePlayer. */
 export function updateCamera(camera, player, controls, dt, elapsed = 0) {
-  const look = controls.consumeLook();
+  const look = controls.getLook();
 
-  // Dragging always wins, and parks the automatic camera for a moment
-  // afterwards so it doesn't immediately undo what you just did.
-  if (look.dx !== 0 || look.dy !== 0) {
-    cameraRig.yaw -= look.dx * LOOK_SENSITIVITY;
+  // The look stick is a PUSH, not a drag: hold it over and the camera keeps
+  // turning. Multiplying by dt is what stops it spinning faster on a fast
+  // phone than a slow one.
+  if (look.magnitude > 0) {
+    cameraRig.yaw -= look.x * LOOK.turnRate * dt;
     cameraRig.pitch = THREE.MathUtils.clamp(
-      cameraRig.pitch - look.dy * LOOK_SENSITIVITY,
-      -0.2,
-      0.9
+      cameraRig.pitch + look.y * LOOK.pitchRate * dt,
+      LOOK.minPitch,
+      LOOK.maxPitch
     );
     lastManualLook = elapsed;
   }
 
   // --- swing round behind him -------------------------------------------
-  // The camera sits at player + (sin yaw, cos yaw) * distance, so to be
-  // BEHIND him the yaw wants to be his facing turned around: facing + PI.
+  // The camera sits at player + (sin yaw, cos yaw) * distance, so to be BEHIND
+  // him the yaw wants to be his facing turned around: facing + PI.
   //
   // This is the loop that used to make him spin, so it's worth being precise
-  // about why it now doesn't. The stick is read relative to the camera, so
-  // the camera moving changes what the stick means:
+  // about why it now doesn't. The move stick is read relative to the camera,
+  // so the camera moving changes what that stick means:
   //
-  //   holding UP    -> he faces away from the camera -> the camera already
-  //                    wants to be exactly where it is. Stable, no drift.
-  //   holding LEFT
-  //   or RIGHT      -> he turns across, the camera follows, and he curves
-  //                    into a wide circle. That's what every third-person
-  //                    game does and it's what you'd expect.
-  //   holding DOWN  -> he turns back at the camera, the camera swings round
-  //                    behind him, "down" now points the other way, and he
-  //                    turns again. THAT is the spin.
+  //   holding FORWARD -> he faces away from the camera, which is exactly where
+  //                      the camera already wants to be. Stable, no drift.
+  //   holding SIDEWAYS -> he turns across, the camera follows, and he curves
+  //                      into a wide circle. Every third-person game does this.
+  //   holding BACK    -> he turns toward the camera, the camera swings behind
+  //                      him, "back" now points the other way, and he turns
+  //                      again. THAT is the spin.
   //
-  // Only the last one runs away, and it's the only one where he ends up
-  // pointed more than about 120 degrees off the camera. So past that angle
-  // the camera stops chasing and simply lets him walk toward it - which is
-  // what you'd want to see anyway.
+  // Only the last runs away, and it's the only one where he ends up more than
+  // about 120 degrees off the camera. Past that angle the camera stops chasing
+  // and lets him walk at it, which is what you'd want to see anyway.
   const facing = player.userData.facing ?? player.rotation.y;
   const wantedYaw = facing + Math.PI;
   const difference = shortestAngle(cameraRig.yaw, wantedYaw);
@@ -238,11 +258,22 @@ export function updateCamera(camera, player, controls, dt, elapsed = 0) {
     }
   }
 
+  // --- place it ----------------------------------------------------------
+  // Smooth the POINT the camera is watching, then put the camera on its orbit
+  // around that point. Smoothing the camera's position instead is what made it
+  // sail over his head: easing a position toward a target that has swung round
+  // to the far side cuts a straight line across the middle - straight through
+  // him - rather than going round. Here the camera is always exactly on the
+  // circle, so it can only ever sweep around him.
   computeLookTarget(player, _target);
-  computeCameraTarget(player, _offset);
 
-  // Frame-rate independent easing: the same result whether a frame took 5
-  // milliseconds or 50.
-  camera.position.lerp(_offset, 1 - Math.pow(0.001, dt));
-  camera.lookAt(_target);
+  if (!followPoint.initialised) {
+    followPoint.copy(_target);
+    followPoint.initialised = true;
+  }
+  followPoint.lerp(_target, 1 - Math.exp(-CAMERA_FOLLOW_RATE * dt));
+
+  orbitOffset(_offset);
+  camera.position.copy(followPoint).add(_offset);
+  camera.lookAt(followPoint);
 }

@@ -233,6 +233,7 @@ loadPenguini().then((character) => {
     poseWalking(character.parts);
     placePlayer(player, world);
     controls = new TouchControls();
+    if (title.sign?.collider) colliders.push(title.sign.collider);
     hud.show();
     mode = 'leaving';
   });
