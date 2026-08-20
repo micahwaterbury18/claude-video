@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - main
-      - claude/penguini-initial-setup-rxiemf
     # Only bother rebuilding when the game (or this file) actually changed.
     paths:
       - "penguini/**"
@@ -23,6 +22,12 @@ permissions:
   id-token: write
 
 # If you push twice quickly, let the second build finish and skip the first.
+#
+# Only main deploys. Work happens on a branch and then gets merged here, and a
+# branch build would be thrown away anyway - GitHub Pages only accepts deploys
+# from the default branch. Worse, pushing the same commit to both refs created
+# two runs racing inside this one concurrency group, and whichever arrived
+# second cancelled the other. That silently cancelled a good deploy.
 concurrency:
   group: pages
   cancel-in-progress: true
