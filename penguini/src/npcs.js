@@ -141,6 +141,11 @@ export function createNPCs(scene, world, routes) {
     walkers,
     update(delta, elapsed) {
       for (const w of walkers) {
+        // A seal that's chasing you is being driven by wanted.js instead, so
+        // leave it alone - otherwise the route drags it back onto its beat
+        // mid-pursuit.
+        if (w.chasing) continue;
+
         const from = w.points[w.leg];
         const to = w.points[(w.leg + 1) % w.points.length];
         const dx = to[0] - from[0];

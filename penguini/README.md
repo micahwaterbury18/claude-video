@@ -104,6 +104,15 @@ story moment in it.
 - [x] NPC penguins and seal cops walking their own routes
 - [ ] Day/night cycle
 - [ ] Enterable interiors
+
+**Phase 3 - missions.**
+
+- [x] Mission system loading objectives from `data/missions.json`
+- [x] Three jobs of escalating risk, gated behind each other
+- [x] A wanted level, and Heat that finally does something
+- [x] Seal cops that spot you, chase you, and bust you
+- [x] A rotating minimap
+- [ ] Missions that can fail, and a cut of the take for Tuck
 - [x] Walking: drag anywhere to move, on phone or computer. WASD too.
 - [x] Third-person camera that follows him and swings in behind
 - [x] Block 9 — Igloo Row, the Krill King, streetlights — with collision

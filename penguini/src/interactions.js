@@ -91,7 +91,8 @@ export function createInteractions(scene, state, dialogue, spots) {
 
   function trigger() {
     if (!nearest || dialogue.isOpen) return;
-    dialogue.open(nearest.scene);
+    if (nearest.action) nearest.action();
+    else dialogue.open(nearest.scene);
     prompt.classList.remove('on');
   }
 
@@ -102,6 +103,23 @@ export function createInteractions(scene, state, dialogue, spots) {
 
   return {
     points,
+
+    /** Replace the mission-giver spots. Story spots are left alone. */
+    setDynamic(spots) {
+      for (let i = points.length - 1; i >= 0; i--) {
+        if (!points[i].dynamic) continue;
+        scene.remove(points[i].marker);
+        points.splice(i, 1);
+      }
+      for (const spot of spots) {
+        const m = createMarker(spot.colour ?? 0xffd166);
+        m.position.set(spot.x, 0, spot.z);
+        m.name = `spot:${spot.id ?? spot.label}`;
+        scene.add(m);
+        points.push({ ...spot, marker: m, dynamic: true });
+      }
+      nearest = null;
+    },
     /** Called every frame with where the player is. */
     update(playerPosition, elapsed, groundHeightAt) {
       let closest = null;
@@ -133,7 +151,7 @@ export function createInteractions(scene, state, dialogue, spots) {
       if (inReach !== nearest) {
         nearest = inReach;
         if (nearest && !dialogue.isOpen) {
-          const done = state.hasPlayed(nearest.scene);
+          const done = nearest.scene ? state.hasPlayed(nearest.scene) : false;
           prompt.innerHTML = `<b>E</b> &nbsp;${done ? 'again — ' : ''}${nearest.label}`;
           prompt.classList.add('on');
         } else {

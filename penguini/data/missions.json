@@ -1,0 +1,70 @@
+{
+  "_readme": [
+    "Every mission in the game. Editable without touching code.",
+    "",
+    "A mission has: id, title, giver (where you pick it up), objectives, rewards.",
+    "",
+    "Objective types:",
+    "  goto     { x, z, radius, label }            walk there",
+    "  talk     { scene, x, z, label }             walk there and press E",
+    "  collect  { points: [[x,z],..], label }      pick up all of them",
+    "  evade    { label }                          shake the seals off",
+    "",
+    "Rewards use the same shape as dialogue effects:",
+    "  { cash, heat, cred, built, took, flags }",
+    "",
+    "requires: flags that must already be set before the mission is offered."
+  ],
+
+  "missions": [
+    {
+      "id": "rent_friday",
+      "title": "RENT IS DUE FRIDAY",
+      "brief": "Sell the tapes yourself. Nobody else is going to.",
+      "requires": { "ch1Complete": true },
+      "giver": { "x": 12, "z": 2, "label": "Take the tapes out" },
+      "risk": "low",
+      "objectives": [
+        { "type": "goto", "x": 62, "z": -4, "radius": 5, "label": "Get to the Boardwalk" },
+        { "type": "collect", "label": "Sell all four tapes",
+          "points": [[54, -18], [76, 8], [88, -22], [58, 24]] },
+        { "type": "goto", "x": 0, "z": 8, "radius": 5, "label": "Go home" }
+      ],
+      "rewards": { "cash": 180, "cred": 4, "built": 3, "flags": { "soldTapes": true } },
+      "outro": "Ninety dollars short of rent, and the best four hours you've had in a month."
+    },
+
+    {
+      "id": "kodi_errand",
+      "title": "ERRANDS",
+      "brief": "Kodi has a package. Kodi does not say what is in the package.",
+      "requires": { "ch1Complete": true },
+      "giver": { "x": 86, "z": -28, "label": "See what Kodi wants" },
+      "risk": "medium",
+      "objectives": [
+        { "type": "goto", "x": 88, "z": -30, "radius": 4, "label": "Take the package" },
+        { "type": "goto", "x": -24, "z": 62, "radius": 6, "label": "Get it to the Docks" },
+        { "type": "goto", "x": 86, "z": -28, "radius": 5, "label": "Back to Kodi for your money" }
+      ],
+      "rewards": { "cash": 420, "cred": 6, "heat": 14, "took": 3, "flags": { "ranForKodi": true } },
+      "outro": "Four hundred and twenty dollars for ninety minutes' walking. That is the entire problem."
+    },
+
+    {
+      "id": "rig_job",
+      "title": "THE RIG JOB",
+      "brief": "Cargo off the harbour rigs. This is not walking a package about.",
+      "requires": { "ranForKodi": true },
+      "giver": { "x": -24, "z": 58, "label": "Meet them at the Docks" },
+      "risk": "high",
+      "objectives": [
+        { "type": "collect", "label": "Get the crates off the pier",
+          "points": [[-34, 92], [-4, 96], [26, 90]] },
+        { "type": "evade", "label": "Lose the seals" },
+        { "type": "goto", "x": 56, "z": 22, "radius": 5, "label": "Lie low at Fathom's" }
+      ],
+      "rewards": { "cash": 1400, "cred": 9, "heat": 30, "took": 6, "flags": { "didRigJob": true } },
+      "outro": "The most money you have ever held. Detective Bask now knows your name."
+    }
+  ]
+}

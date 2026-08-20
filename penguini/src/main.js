@@ -25,6 +25,9 @@ import {
 } from './districts.js';
 import { createNPCs, ROUTES } from './npcs.js';
 import { createMap } from './map.js';
+import { createMissions } from './missions.js';
+import { createWanted } from './wanted.js';
+import { createMinimap } from './minimap.js';
 import {
   cameraRig, poseWalking, placePlayer, updatePlayer, updateCamera,
   computeCameraTarget, computeLookTarget,
@@ -124,15 +127,48 @@ state.load();                              // pick up where you left off
 
 const hud = createHUD(state);
 
+const missions = createMissions(scene, state, world);
+const wanted = createWanted(state, npcs, world);
+
 const dialogue = createDialogue(state, {
   // A conversation takes the controls away, so he doesn't wander off mid-scene.
   onOpen: () => controls?.resetAll(),
-  onClose: () => controls?.resetAll(),
+  onClose: (sceneId) => {
+    controls?.resetAll();
+    missions.onSceneFinished(sceneId);
+    refreshMissionGivers();
+  },
 });
 
 // The three spots on the block you can walk up to. Adding a fourth is one
 // line here plus a scene in data/scenes.json.
 const map = createMap(state, { get points() { return interactions.points; } });
+
+const minimap = createMinimap(
+  colliders, npcs,
+  { get currentObjective() { return missions.currentObjective; },
+    get active() { return missions.active; } },
+  { get level() { return wanted.level; } },
+  { get points() { return interactions.points; } }
+);
+
+/**
+ * Put a marker on every job you're currently allowed to take, and take away
+ * the ones you can't. Called when the game starts and after every scene, since
+ * finishing a conversation is what usually unlocks the next job.
+ */
+function refreshMissionGivers() {
+  interactions.setDynamic(
+    missions.available().map((m) => ({
+      id: m.id,
+      label: m.giver.label,
+      x: m.giver.x,
+      z: m.giver.z,
+      colour: 0xffd166,
+      action: () => { missions.start(m); refreshMissionGivers(); },
+    }))
+  );
+}
 
 const interactions = createInteractions(scene, state, dialogue, [
   { scene: 'ch1_frostbite', label: 'Talk to Slick', x: -15, z: 14.5, colour: 0xff4d8d },
@@ -215,6 +251,9 @@ function frame() {
       updateCamera(camera, player, controls, delta, elapsed);
       interactions.update(player.position, elapsed, world.groundHeightAt);
       map.update(player);
+      wanted.update(delta, player);
+      missions.update(player, elapsed, wanted.level);
+      minimap.update(player);
     }
   } else {
     // Still loading. Show the empty street rather than a black rectangle.
@@ -267,6 +306,8 @@ loadPenguini().then((character) => {
     hud.show();
     map.showButton();
     map.bind(() => player);
+    minimap.show();
+    refreshMissionGivers();
     mode = 'leaving';
   });
 
@@ -287,5 +328,6 @@ loadPenguini().then((character) => {
                       get elapsed() { return timer.getElapsed(); },
                       get simTime() { return simTime; },
                       state, dialogue, interactions, alley, map, npcs,
+                      missions, wanted, minimap,
                       districts: { boardwalk, docks, meridian } };
 });
